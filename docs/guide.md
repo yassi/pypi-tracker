@@ -13,7 +13,7 @@ It builds on PyPIStats rather than replacing it: PyPIStats is still the only dat
 Requires Python 3.12+. There are no third-party dependencies.
 
 ```bash
-pip install git+https://github.com/yassi/pypi-tracker.git
+pip install pypi-tracker
 ```
 
 From a checkout: `pip install .` (add `".[dev]"` and run `pytest` to run the tests).
@@ -112,15 +112,17 @@ left alone, and the command exits nonzero.
 ```python
 from pypi_tracker import Tracker
 
-tracker = Tracker.from_config("config/packages.toml", data_dir="data/", output_dir="public/")
+tracker = Tracker.from_config(
+    "config/packages.toml", data_dir="data/", output_dir="public/"
+)
 # or: tracker = Tracker(packages=["dj-control-room"], data_dir="data/", output_dir="public/")
 
-tracker.collect()                    # returns the packages whose CSV changed
-tracker.build()                      # returns the report files that changed
-tracker.sync()                       # returns both
-tracker.validate()                   # {package: {"problems": [...], "gaps": [...], "recorded_days": n}}
+tracker.collect()  # returns the packages whose CSV changed
+tracker.build()  # returns the report files that changed
+tracker.sync()  # returns both
+tracker.validate()  # {package: {"problems": [...], "gaps": [...], "recorded_days": n}}
 
-history = tracker.history("dj-control-room")   # {datetime.date: int}
+history = tracker.history("dj-control-room")  # {datetime.date: int}
 ```
 
 `collect`, `build` and `sync` try every package and then raise `PartialFailure` if any failed; its
