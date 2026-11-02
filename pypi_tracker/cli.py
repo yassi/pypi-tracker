@@ -3,6 +3,7 @@
 import argparse
 import sys
 from collections.abc import Sequence
+from importlib.metadata import version
 
 from .config import resolve_path
 from .errors import ConfigError, TrackerError
@@ -38,6 +39,8 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pypi-tracker", description="Preserve PyPI download history and export static JSON."
     )
+    # shortcut: needs installed package metadata, so the CLI won't start from a bare PYTHONPATH checkout.
+    parser.add_argument("--version", action="version", version=f"%(prog)s {version('pypi-tracker')}")
     commands = parser.add_subparsers(required=True)
 
     source = argparse.ArgumentParser(add_help=False)

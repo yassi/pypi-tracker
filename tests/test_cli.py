@@ -1,4 +1,5 @@
 from datetime import date
+from importlib.metadata import version
 from urllib.error import URLError
 
 import pytest
@@ -20,6 +21,13 @@ def project(tmp_path, monkeypatch):
     cwd.mkdir()
     monkeypatch.chdir(cwd)
     return config
+
+
+def test_version_flag_prints_the_installed_version(capsys):
+    with pytest.raises(SystemExit) as caught:
+        main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr().out == f"pypi-tracker {version('pypi-tracker')}\n"
 
 
 def test_collect_uses_paths_declared_relative_to_config(project, api):
