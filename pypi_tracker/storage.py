@@ -13,9 +13,9 @@ History = dict[date, int]
 _HEADER = ["date", "downloads"]
 
 
-def write_atomic(path: Path, text: str) -> bool:
+def write_atomic(path: Path, content: str | bytes) -> bool:
     """Replace a file's contents in one step. Returns False if it already had this content."""
-    data = text.encode("utf-8")
+    data = content.encode("utf-8") if isinstance(content, str) else content
     if path.exists() and path.read_bytes() == data:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)

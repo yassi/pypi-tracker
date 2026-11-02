@@ -87,7 +87,7 @@ Every command exits nonzero on failure.
 | `collect` | Fetch observations and merge them into the CSVs | Yes |
 | `build` | Generate JSON reports from the CSVs | No |
 | `sync` | `collect`, then `build`; the command to automate | Yes |
-| `dashboard` | `build`, then write a static page charting the reports | No |
+| `dashboard` | `build`, then write a static website charting the reports | No |
 | `validate` | Check the CSVs | No |
 | `init` | Write an example config (never overwrites a file) | No |
 
@@ -121,7 +121,7 @@ tracker = Tracker.from_config(
 tracker.collect()  # returns the packages whose CSV changed
 tracker.build()  # returns the report files that changed
 tracker.sync()  # returns both
-tracker.dashboard()  # builds reports and the web page, and returns the files that changed
+tracker.dashboard()  # builds reports and the website, and returns the files that changed
 tracker.validate()  # {package: {"problems": [...], "gaps": [...], "recorded_days": n}}
 
 history = tracker.history("dj-control-room")  # {datetime.date: int}
@@ -230,25 +230,55 @@ The identifier key is `week` (`"2026-W44"`), `month` (`"2026-10"`) or `year` (`2
 **`summary.json`** holds `as_of`, `earliest_date`, `latest_date`, `recorded_downloads`, `recorded_days`,
 `missing_days` and `gaps` (a list of `{start, end, days}`).
 
+## Aggregate reports
+
+`build` also writes the same reports for the whole collection to `aggregate/`, with `packages` (a list)
+in place of `package`. Two rules make them honest:
+
+- **A date counts only when every package has data for it.** Other dates are `null`, never a partial sum,
+  and rolling windows end on the latest date all packages share.
+- **Calendar reports keep every period since the first observation.** Periods from before a newer package
+  joined stay in the file, marked incomplete with their real `recorded_days`.
+
+Aggregate downloads are a sum of downloads, not unique installs or users.
+
+Aggregate rolling reports add `breakdown`, each package's own numbers for that window:
+`{package, downloads, recorded_days, missing_days, previous_downloads}`. Aggregate `summary.json` adds
+`first_observed_date`, the earliest date from any package. Rows count each package's own recorded days, so
+with missing data they can add up to more than the aggregate total.
+
 ## Dashboard
 
-`pypi-tracker dashboard` runs `build`, then writes three files to `public/dashboard/`: `index.html`,
-`app.js` and `style.css`. They have no dependencies and load no outside resources. The page shows a card
-for each package, with buttons for the rolling windows and calendar reports selected in your config.
+`pypi-tracker dashboard` runs `build`, then writes a complete static site to the output directory:
+`index.html`, plus `assets/app.js`, `assets/style.css` and your logo. It has no dependencies, loads nothing
+from a CDN, and never calls PyPIStats. Publish the whole output directory to any static host, at any path.
 
 ```bash
 pypi-tracker dashboard --config pypi-tracker.toml
-python -m http.server -d public  # then open http://localhost:8000/dashboard/
+python -m http.server -d public  # then open http://localhost:8000/
 ```
 
-- The page reads the JSON reports from `../packages/`, so publish the whole output directory. It doesn't
-  work when opened directly from disk, because browsers block those requests.
-- It gets its own folder so it can't overwrite your own `public/index.html`.
-- The package and report lists are written into `index.html`, so rerun `dashboard` after changing them.
-  `sync` and `build` refresh the data it shows without needing a rerun.
-- Calendar cards lead with the latest complete period, and draw partial periods as lighter bars.
-- Gaps in a line are days with no recorded data. Each chart has its own vertical scale, so compare numbers
-  rather than heights between packages.
+Everything in the `[dashboard]` section is optional:
+
+```toml
+[dashboard]
+enabled = true                # build and sync write the site too, so you don't need a separate step
+title = "Django Control Room"
+description = "Download statistics across the DCR ecosystem"
+logo = "assets/logo.svg"      # .svg, .png or .webp, relative to this config file; also the favicon
+theme = "auto"                # auto, light or dark; visitors can still switch
+accent_color = "#6366f1"
+```
+
+- The site needs `reports.historical = ["daily"]` and `reports.summary = true`, and fails with a clear
+  error without them.
+- It won't overwrite an `index.html` that pypi-tracker didn't generate.
+- It doesn't work when opened directly from disk, because browsers block those requests.
+- Selections are kept in the URL, such as `?range=90d&packages=foo,bar&granularity=weekly`, so views can
+  be shared. `view=packages` shows one line per package, up to the eight largest.
+- The first view loads only `aggregate/summary.json` and one rolling report. Other views fetch each
+  selected package's yearly files and are combined in the browser.
+- Average and change figures use recorded days only. Change is shown only when both periods are complete.
 
 ## Missing data and completeness
 
@@ -332,14 +362,15 @@ a final workflow step, or use `actions/upload-pages-artifact` for GitHub Pages:
           command: pages deploy public --project-name=my-stats
 ```
 
-To publish the [dashboard](#dashboard) too, add a `pypi-tracker dashboard` step before deploying, using the
-same `--config` and paths as `sync`. It's served from the same origin as the reports, so it doesn't need CORS.
+To publish the [dashboard](#dashboard) too, set `enabled = true` in its config section. It's served from the same origin as the reports, so it doesn't need CORS.
 
 A browser on another origin can only read the JSON with CORS enabled. On Cloudflare Pages, add a
 `public/_headers` file; `build` leaves it in place:
 
 ```text
 /packages/*
+  Access-Control-Allow-Origin: *
+/aggregate/*
   Access-Control-Allow-Origin: *
 ```
 

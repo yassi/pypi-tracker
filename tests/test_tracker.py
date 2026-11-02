@@ -163,6 +163,15 @@ class TestBuild:
             "recorded_days": 3,
             "missing_days": 4,
             "complete": False,
+            "previous": {
+                "start": "2025-12-19",
+                "end": "2025-12-25",
+                "days": 7,
+                "downloads": None,
+                "recorded_days": 0,
+                "missing_days": 7,
+                "complete": False,
+            },
             "observations": [
                 {"date": "2025-12-26", "downloads": None},
                 {"date": "2025-12-27", "downloads": None},
@@ -209,7 +218,7 @@ class TestBuild:
         history = tracker.history("foo")
         history[date(2025, 12, 30)] = 99
         write_history(tracker.data_dir / "foo.csv", history)
-        names = [path.relative_to(built).as_posix() for path in tracker.build()]
+        names = [path.relative_to(built).as_posix() for path in tracker.build() if path.is_relative_to(built)]
         assert "daily/2025.json" in names
         assert "daily/2026.json" not in names
 

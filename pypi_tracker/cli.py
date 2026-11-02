@@ -19,6 +19,10 @@ calendar = ["weekly", "monthly", "yearly"]
 historical = ["daily"]
 summary = true
 
+[dashboard]
+enabled = true
+title = "PyPI Package Statistics"
+
 [storage]
 directory = "data/"
 
@@ -51,7 +55,7 @@ def _parser() -> argparse.ArgumentParser:
         "--package", action="append", help="package to process, instead of the config's (repeatable)"
     )
     output = argparse.ArgumentParser(add_help=False)
-    output.add_argument("--output-dir", help="directory receiving JSON reports")
+    output.add_argument("--output-dir", help="directory receiving JSON reports and the site")
 
     def add(name: str, handler, help: str, parents: list) -> argparse.ArgumentParser:
         command = commands.add_parser(name, help=help, parents=parents)
@@ -61,7 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     add("collect", _collect, "fetch observations and merge them into CSV storage", [source])
     add("build", _build, "generate JSON reports from stored history", [source, output])
     add("sync", _sync, "collect, then build", [source, output])
-    add("dashboard", _dashboard, "build reports and a static web page charting them", [source, output])
+    add("dashboard", _dashboard, "build reports and a static website charting them", [source, output])
     add("validate", _validate, "check the historical dataset", [source])
 
     init = add("init", _init, "write an example configuration file", [])
@@ -101,9 +105,9 @@ def _sync(args: argparse.Namespace) -> int:
 def _dashboard(args: argparse.Namespace) -> int:
     tracker = _tracker(args)
     tracker.dashboard()
-    print(f"wrote {tracker.output_dir / 'dashboard' / 'index.html'}")
+    print(f"wrote {tracker.output_dir / 'index.html'}")
     print(f"preview: python -m http.server -d {shlex.quote(str(tracker.output_dir))}")
-    print("then open http://localhost:8000/dashboard/")
+    print("then open http://localhost:8000/")
     return 0
 
 

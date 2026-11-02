@@ -12,6 +12,8 @@ DEFAULT_DATA_DIR = "data"
 DEFAULT_OUTPUT_DIR = "public"
 CALENDAR_REPORTS = ("weekly", "monthly", "yearly")
 HISTORICAL_REPORTS = ("daily",)
+THEMES = ("auto", "light", "dark")
+LOGO_TYPES = (".svg", ".png", ".webp")
 
 # Names become file paths, so this also blocks path traversal.
 _PACKAGE_NAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
@@ -38,9 +40,39 @@ class ReportSettings:
 
 
 @dataclass(frozen=True)
+class DashboardSettings:
+    """The generated site's identity. `enabled` makes `build` and `sync` write the site too."""
+
+    enabled: bool = False
+    title: str = "PyPI Package Statistics"
+    description: str = ""
+    logo: str | Path | None = None
+    theme: str = "auto"
+    accent_color: str | None = None
+
+    def __post_init__(self):
+        if type(self.enabled) is not bool:
+            raise ConfigError(f"dashboard.enabled must be true or false, got {self.enabled!r}")
+        for name in ("title", "description"):
+            if not isinstance(getattr(self, name), str):
+                raise ConfigError(f"dashboard.{name} must be text, got {getattr(self, name)!r}")
+        if self.logo is not None and Path(self.logo).suffix.lower() not in LOGO_TYPES:
+            raise ConfigError(f"dashboard.logo must be one of {', '.join(LOGO_TYPES)}, got {self.logo!r}")
+        if self.theme not in THEMES:
+            raise ConfigError(f"dashboard.theme must be one of {', '.join(THEMES)}, got {self.theme!r}")
+        # This value goes straight into the page's CSS, so only real colors are allowed.
+        if self.accent_color is not None and not (
+            isinstance(self.accent_color, str)
+            and re.fullmatch(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})", self.accent_color)
+        ):
+            raise ConfigError(f"dashboard.accent_color must look like #6366f1, got {self.accent_color!r}")
+
+
+@dataclass(frozen=True)
 class Config:
     packages: list[str]
     reports: ReportSettings
+    dashboard: DashboardSettings
     data_dir: Path | None
     output_dir: Path | None
 
@@ -75,15 +107,21 @@ def load_config(path: str | Path) -> Config:
 
 
 def _parse(raw: dict, base: Path) -> Config:
-    _reject_unknown_keys("top level", raw, {"packages", "reports", "storage", "output"})
+    _reject_unknown_keys("top level", raw, {"packages", "reports", "dashboard", "storage", "output"})
 
     packages = raw.get("packages") or []
     _require_list("packages", packages)
 
     reports = _section(raw, "reports", {"rolling_days", "calendar", "historical", "summary"})
+    dashboard = _section(
+        raw, "dashboard", {"enabled", "title", "description", "logo", "theme", "accent_color"}
+    )
+    if isinstance(dashboard.get("logo"), str):
+        dashboard["logo"] = resolve_path(dashboard["logo"], base)
     return Config(
         packages=normalize_packages(packages),
         reports=ReportSettings(**reports),
+        dashboard=DashboardSettings(**dashboard),
         data_dir=_directory(raw, "storage", base),
         output_dir=_directory(raw, "output", base),
     )

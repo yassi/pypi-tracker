@@ -13,7 +13,7 @@ pypi-tracker sync --package dj-control-room
 ```
 
 You now have the full history in `data/dj-control-room.csv` and reports in
-`public/packages/dj-control-room/`, such as `last-30-days.json`:
+`public/packages/dj-control-room/` (`public/aggregate/` covers all your packages together), such as `last-30-days.json`:
 
 ```json
 {
@@ -40,7 +40,7 @@ never `0`, and `complete` tells you whether any day is missing.
 | `sync` | Runs `collect`, then `build`. This is the one to schedule. |
 | `collect` | Fetches new data from PyPIStats and merges it into the CSVs. |
 | `build` | Writes the JSON report files to publish. |
-| `dashboard` | Runs `build`, then writes a static web page that charts the reports. |
+| `dashboard` | Runs `build`, then writes a static website that charts the reports. |
 | `validate` | Checks the CSVs for bad data and missing dates. |
 
 ## Tracking several packages
@@ -72,6 +72,10 @@ calendar = ["weekly", "monthly", "yearly"]
 historical = ["daily"]
 summary = true
 
+[dashboard]
+enabled = true
+title = "PyPI Package Statistics"
+
 [storage]
 directory = "data/"
 
@@ -84,18 +88,24 @@ You can update both reports and historical data by running a single `sync` comma
 pypi-tracker sync --config pypi-tracker.toml
 ```
 
-## See your data
+## Publish a dashboard
 
-`dashboard` adds a page to `public/dashboard/`, with a chart and data table for each package. It's just
-an HTML, a JavaScript and a CSS file, with nothing to install or host beyond your static files.
+`dashboard` turns your history into a complete static website, ready for any static host. It needs no
+backend and no configuration, though you can brand it:
 
 ```bash
 pypi-tracker dashboard --config pypi-tracker.toml
-python -m http.server -d public  # then open http://localhost:8000/dashboard/
+python -m http.server -d public  # then open http://localhost:8000/
 ```
 
-Browsers won't load the reports from a page opened directly from disk, so preview it through a local
-server as shown.
+```toml
+[dashboard]
+enabled = true  # sync updates the site too
+title = "Django Control Room"
+description = "Download statistics across the DCR ecosystem"
+logo = "assets/logo.svg"
+accent_color = "#6366f1"
+```
 
 ## Keep your CSVs
 

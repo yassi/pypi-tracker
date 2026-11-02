@@ -10,6 +10,7 @@ from .client import fetch_overall
 from .config import (
     DEFAULT_DATA_DIR,
     DEFAULT_OUTPUT_DIR,
+    DashboardSettings,
     ReportSettings,
     load_config,
     normalize_packages,
@@ -26,11 +27,13 @@ class Tracker:
         data_dir: str | Path = DEFAULT_DATA_DIR,
         output_dir: str | Path = DEFAULT_OUTPUT_DIR,
         reports: ReportSettings = ReportSettings(),
+        site: DashboardSettings = DashboardSettings(),
     ):
         self.packages = normalize_packages(packages)
         self.data_dir = resolve_path(data_dir)
         self.output_dir = resolve_path(output_dir)
         self.reports = reports
+        self.site = site
 
     @classmethod
     def from_config(
@@ -47,6 +50,7 @@ class Tracker:
             data_dir=data_dir or config.data_dir or DEFAULT_DATA_DIR,
             output_dir=output_dir or config.output_dir or DEFAULT_OUTPUT_DIR,
             reports=config.reports,
+            site=config.dashboard,
         )
 
     def collect(self) -> list[str]:
@@ -71,17 +75,23 @@ class Tracker:
         """Generate JSON reports from local CSVs and return the files that changed.
 
         Never touches the network. Raises PartialFailure after trying every package.
+        Collection-wide output is only written when building every package, with no failures.
         """
-        written, failures = [], {}
+        written, failures, histories = [], {}, {}
         for package in self._selected() if packages is None else packages:
             try:
+                histories[package] = self.history(package)
                 written += reports.write_reports(
-                    package, self.history(package), self.output_dir, self.reports
+                    package, histories[package], self.output_dir, self.reports
                 )
             except (TrackerError, OSError) as error:
                 failures[package] = str(error)
         if failures:
             raise PartialFailure("report generation", failures)
+        if packages is None:
+            written += reports.write_aggregate(histories, self.output_dir, self.reports)
+            if self.site.enabled:
+                written += self._write_site()
         return written
 
     def sync(self) -> tuple[list[str], list[Path]]:
@@ -98,9 +108,8 @@ class Tracker:
         return changed, self.build()
 
     def dashboard(self) -> list[Path]:
-        """Build the reports, then the static page that charts them. Returns the changed files."""
-        written = self.build()
-        return written + reports.write_dashboard(self._selected(), self.output_dir, self.reports)
+        """Build the reports, then the static site that charts them. Returns the changed files."""
+        return self.build() + self._write_site()
 
     def history(self, package: str) -> History:
         """Stored observations for a package as {date: downloads}."""
@@ -117,6 +126,9 @@ class Tracker:
                 "recorded_days": len(history),
             }
         return results
+
+    def _write_site(self) -> list[Path]:
+        return reports.write_site(self._selected(), self.output_dir, self.reports, self.site)
 
     def _collect_one(self, package: str) -> bool:
         path = self._csv_path(package)
