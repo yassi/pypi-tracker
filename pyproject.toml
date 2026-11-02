@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pypi-tracker"
+version = "0.1.0"
+description = "Permanently preserve PyPI download history and export it as static JSON reports."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+pypi-tracker = "pypi_tracker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pypi_tracker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
