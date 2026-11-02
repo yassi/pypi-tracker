@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en"__THEME____ACCENT__>
+<html lang="en" __THEME____ACCENT__>
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,9 +9,10 @@
   __META__
   <link rel="icon" href="__ICON__">
   <link rel="stylesheet" href="assets/style.css">
-  <script>try { const theme = localStorage.getItem("pypi-tracker-theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}</script>
+  <script>try { const theme = localStorage.getItem("pypi-tracker-theme"); if (theme) document.documentElement.dataset.theme = theme; } catch { }</script>
   <script src="assets/app.js" defer></script>
 </head>
+
 <body data-config="__CONFIG__">
   <header class="site-header">
     <div class="identity">
@@ -38,7 +40,9 @@
         <div id="chart-controls" class="controls"></div>
       </div>
       <div id="legend" class="legend"></div>
-      <div id="chart" class="chart"><p class="state">Loading…</p></div>
+      <div id="chart" class="chart">
+        <p class="state">Loading…</p>
+      </div>
       <p id="chart-note" class="note"></p>
       <details class="data-table">
         <summary>View as table</summary>
@@ -47,15 +51,18 @@
     </section>
 
     <section id="breakdown-panel" class="panel">
-      <div class="panel-head"><h2>Package breakdown</h2></div>
+      <div class="panel-head">
+        <h2>Package breakdown</h2>
+      </div>
       <div id="breakdown" class="table-wide"></div>
       <p id="breakdown-note" class="note"></p>
     </section>
   </main>
 
   <footer class="site-footer">
-    Downloads from PyPIStats, excluding mirrors. They count downloads, not unique installs or users.
+    Downloads from PyPIStats, excluding mirrors. This counts downloads, not unique installs or users.
   </footer>
   <div id="tooltip" class="tooltip" aria-hidden="true" hidden></div>
 </body>
+
 </html>
