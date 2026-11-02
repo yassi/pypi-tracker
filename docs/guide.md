@@ -77,7 +77,8 @@ Output directories are created as needed. A CSV that an operation requires is ne
 
 ## Commands
 
-All commands except `init` accept `--config`, `--data-dir` and repeatable `--package`. `--package`
+All commands except `init` accept `--config`, `--data-dir` and repeatable `--package`. Without `--config`,
+`./pypi-tracker.toml` is used if it exists. `--package`
 replaces the config's package list. `build`, `sync` and `dashboard` also accept `--output-dir`.
 
 Every command exits nonzero on failure.

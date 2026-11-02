@@ -48,7 +48,7 @@ never `0`, and `complete` tells you whether any day is missing.
 You will typically want to keep a config file where you specify the packages you want to track.
 
 ```bash
-pypi-tracker init  # generates a new pypi-tracker.toml file in the current directory
+pypi-tracker init  # generates a pypi-tracker.toml file, which commands in this directory then use
 ```
 
 A complete config file will have the sections seen below. Note that the `pypi-tracker` also

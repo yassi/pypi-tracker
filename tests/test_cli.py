@@ -23,6 +23,22 @@ def project(tmp_path, monkeypatch):
     return config
 
 
+def test_config_in_the_current_directory_is_used_automatically(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pypi-tracker.toml").write_text('packages = ["foo"]\n[dashboard]\ntitle = "Mine"\n')
+    write_history(tmp_path / "data" / "foo.csv", {date(2026, 1, 1): 1})
+    assert main(["dashboard"]) == 0
+    assert "<title>Mine</title>" in (tmp_path / "public" / "index.html").read_text()
+
+
+def test_an_explicit_config_beats_the_one_in_the_current_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pypi-tracker.toml").write_text("not valid toml [")
+    (tmp_path / "other.toml").write_text('packages = ["foo"]\n')
+    write_history(tmp_path / "data" / "foo.csv", {date(2026, 1, 1): 1})
+    assert main(["build", "--config", "other.toml"]) == 0
+
+
 def test_version_flag_prints_the_installed_version(capsys):
     with pytest.raises(SystemExit) as caught:
         main(["--version"])

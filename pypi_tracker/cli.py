@@ -5,11 +5,13 @@ import shlex
 import sys
 from collections.abc import Sequence
 from importlib.metadata import version
+from pathlib import Path
 
 from .config import resolve_path
 from .errors import ConfigError, TrackerError
 from .tracker import Tracker
 
+DEFAULT_CONFIG = "pypi-tracker.toml"
 EXAMPLE_CONFIG = """\
 packages = ["example-package"]
 
@@ -49,7 +51,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(required=True)
 
     source = argparse.ArgumentParser(add_help=False)
-    source.add_argument("--config", help="TOML configuration file")
+    source.add_argument("--config", help=f"TOML configuration file (default: ./{DEFAULT_CONFIG} if it exists)")
     source.add_argument("--data-dir", help="directory of historical CSV files")
     source.add_argument(
         "--package", action="append", help="package to process, instead of the config's (repeatable)"
@@ -69,15 +71,16 @@ def _parser() -> argparse.ArgumentParser:
     add("validate", _validate, "check the historical dataset", [source])
 
     init = add("init", _init, "write an example configuration file", [])
-    init.add_argument("--output", default="pypi-tracker.toml", help="where to write it")
+    init.add_argument("--output", default=DEFAULT_CONFIG, help="where to write it")
     return parser
 
 
 def _tracker(args: argparse.Namespace) -> Tracker:
     output_dir = getattr(args, "output_dir", None)
-    if args.config:
+    config = args.config or (DEFAULT_CONFIG if Path(DEFAULT_CONFIG).exists() else None)
+    if config:
         return Tracker.from_config(
-            args.config, data_dir=args.data_dir, output_dir=output_dir, packages=args.package
+            config, data_dir=args.data_dir, output_dir=output_dir, packages=args.package
         )
     paths = {"data_dir": args.data_dir, "output_dir": output_dir}
     return Tracker(args.package or (), **{key: value for key, value in paths.items() if value})
