@@ -1,7 +1,6 @@
 """The `pypi-tracker` command line. All real work happens in Tracker."""
 
 import argparse
-import shlex
 import sys
 from collections.abc import Sequence
 from importlib.metadata import version
@@ -9,6 +8,7 @@ from pathlib import Path
 
 from .config import resolve_path
 from .errors import ConfigError, TrackerError
+from .server import serve
 from .tracker import Tracker
 
 DEFAULT_CONFIG = "pypi-tracker.toml"
@@ -68,6 +68,10 @@ def _parser() -> argparse.ArgumentParser:
     add("build", _build, "generate JSON reports from stored history", [source, output])
     add("sync", _sync, "collect, then build", [source, output])
     add("dashboard", _dashboard, "build reports and a static website charting them", [source, output])
+    serve_command = add(
+        "serve", _serve, "generate the site and preview it locally, updating on changes", [source, output]
+    )
+    serve_command.add_argument("--port", type=int, default=8000, help="port to listen on (default: 8000)")
     add("validate", _validate, "check the historical dataset", [source])
 
     init = add("init", _init, "write an example configuration file", [])
@@ -109,8 +113,12 @@ def _dashboard(args: argparse.Namespace) -> int:
     tracker = _tracker(args)
     tracker.dashboard()
     print(f"wrote {tracker.output_dir / 'index.html'}")
-    print(f"preview: python -m http.server -d {shlex.quote(str(tracker.output_dir))}")
-    print("then open http://localhost:8000/")
+    print("preview it with: pypi-tracker serve")
+    return 0
+
+
+def _serve(args: argparse.Namespace) -> int:
+    serve(lambda: _tracker(args), resolve_path(args.config or DEFAULT_CONFIG), args.port)
     return 0
 
 

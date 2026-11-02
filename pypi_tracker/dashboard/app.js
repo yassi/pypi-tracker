@@ -948,7 +948,7 @@ async function start() {
   // Browsers block fetching local files, so the page has to be served over HTTP.
   if (location.protocol === "file:") {
     byId("chart").replaceChildren();
-    showMessage("This page must be served over HTTP. Run python -m http.server in this folder, then open http://localhost:8000/.");
+    showMessage("This page must be served over HTTP. Run pypi-tracker serve, then open http://localhost:8000/.");
     byId("main").setAttribute("aria-busy", "false");
     return;
   }

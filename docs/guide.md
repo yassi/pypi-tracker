@@ -79,7 +79,7 @@ Output directories are created as needed. A CSV that an operation requires is ne
 
 All commands except `init` accept `--config`, `--data-dir` and repeatable `--package`. Without `--config`,
 `./pypi-tracker.toml` is used if it exists. `--package`
-replaces the config's package list. `build`, `sync` and `dashboard` also accept `--output-dir`.
+replaces the config's package list. `build`, `sync`, `dashboard` and `serve` also accept `--output-dir`.
 
 Every command exits nonzero on failure.
 
@@ -89,6 +89,7 @@ Every command exits nonzero on failure.
 | `build` | Generate JSON reports from the CSVs | No |
 | `sync` | `collect`, then `build`; the command to automate | Yes |
 | `dashboard` | `build`, then write a static website charting the reports | No |
+| `serve` | `dashboard`, then preview the site locally, updating on changes | No |
 | `validate` | Check the CSVs | No |
 | `init` | Write an example config (never overwrites a file) | No |
 
@@ -255,9 +256,13 @@ with missing data they can add up to more than the aggregate total.
 from a CDN, and never calls PyPIStats. Publish the whole output directory to any static host, at any path.
 
 ```bash
-pypi-tracker dashboard --config pypi-tracker.toml
-python -m http.server -d public  # then open http://localhost:8000/
+pypi-tracker dashboard  # writes the site, ready to publish
+pypi-tracker serve      # or: generate it and preview it at http://localhost:8000/
 ```
+
+`serve` regenerates the site and reloads open pages when your config, CSVs or logo change, so you can edit
+the title and watch it update, or run `sync` in another terminal. It listens only on your own computer, and
+`--port` changes the port. Use it for previewing, and a static host for publishing.
 
 Everything in the `[dashboard]` section is optional:
 

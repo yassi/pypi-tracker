@@ -41,6 +41,7 @@ never `0`, and `complete` tells you whether any day is missing.
 | `collect` | Fetches new data from PyPIStats and merges it into the CSVs. |
 | `build` | Writes the JSON report files to publish. |
 | `dashboard` | Runs `build`, then writes a static website that charts the reports. |
+| `serve` | Runs `dashboard`, then previews the site locally, reloading it when anything changes. |
 | `validate` | Checks the CSVs for bad data and missing dates. |
 
 ## Tracking several packages
@@ -94,8 +95,7 @@ pypi-tracker sync --config pypi-tracker.toml
 backend and no configuration, though you can brand it:
 
 ```bash
-pypi-tracker dashboard --config pypi-tracker.toml
-python -m http.server -d public  # then open http://localhost:8000/
+pypi-tracker serve  # generates the site, then previews it at http://localhost:8000/
 ```
 
 ```toml

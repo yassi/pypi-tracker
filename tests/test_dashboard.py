@@ -249,7 +249,7 @@ def test_cli_uses_output_dir_and_explains_how_to_preview(tmp_path, capsys):
     assert code == 0
     assert (tmp_path / "site" / "index.html").exists()
     out = capsys.readouterr().out
-    assert "http.server" in out and "http://localhost:8000/" in out
+    assert "pypi-tracker serve" in out
 
 
 def test_cli_failure_exits_nonzero(tmp_path, capsys):
