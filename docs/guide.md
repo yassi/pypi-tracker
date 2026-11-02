@@ -78,7 +78,7 @@ Output directories are created as needed. A CSV that an operation requires is ne
 ## Commands
 
 All commands except `init` accept `--config`, `--data-dir` and repeatable `--package`. `--package`
-replaces the config's package list. `build` and `sync` also accept `--output-dir`.
+replaces the config's package list. `build`, `sync` and `dashboard` also accept `--output-dir`.
 
 Every command exits nonzero on failure.
 
@@ -87,6 +87,7 @@ Every command exits nonzero on failure.
 | `collect` | Fetch observations and merge them into the CSVs | Yes |
 | `build` | Generate JSON reports from the CSVs | No |
 | `sync` | `collect`, then `build`; the command to automate | Yes |
+| `dashboard` | `build`, then write a static page charting the reports | No |
 | `validate` | Check the CSVs | No |
 | `init` | Write an example config (never overwrites a file) | No |
 
@@ -97,7 +98,7 @@ pypi-tracker sync --config config/packages.toml --data-dir data/ --output-dir pu
 pypi-tracker validate --config config/packages.toml
 ```
 
-Without a package list, `build` and `validate` use every CSV in the data directory. `collect`
+Without a package list, `build`, `dashboard` and `validate` use every CSV in the data directory. `collect`
 and `sync` need an explicit list.
 
 `validate` fails on malformed dates or counts, negative counts, duplicates and out-of-order rows.
@@ -120,6 +121,7 @@ tracker = Tracker.from_config(
 tracker.collect()  # returns the packages whose CSV changed
 tracker.build()  # returns the report files that changed
 tracker.sync()  # returns both
+tracker.dashboard()  # builds reports and the web page, and returns the files that changed
 tracker.validate()  # {package: {"problems": [...], "gaps": [...], "recorded_days": n}}
 
 history = tracker.history("dj-control-room")  # {datetime.date: int}
@@ -228,6 +230,26 @@ The identifier key is `week` (`"2026-W44"`), `month` (`"2026-10"`) or `year` (`2
 **`summary.json`** holds `as_of`, `earliest_date`, `latest_date`, `recorded_downloads`, `recorded_days`,
 `missing_days` and `gaps` (a list of `{start, end, days}`).
 
+## Dashboard
+
+`pypi-tracker dashboard` runs `build`, then writes three files to `public/dashboard/`: `index.html`,
+`app.js` and `style.css`. They have no dependencies and load no outside resources. The page shows a card
+for each package, with buttons for the rolling windows and calendar reports selected in your config.
+
+```bash
+pypi-tracker dashboard --config pypi-tracker.toml
+python -m http.server -d public  # then open http://localhost:8000/dashboard/
+```
+
+- The page reads the JSON reports from `../packages/`, so publish the whole output directory. It doesn't
+  work when opened directly from disk, because browsers block those requests.
+- It gets its own folder so it can't overwrite your own `public/index.html`.
+- The package and report lists are written into `index.html`, so rerun `dashboard` after changing them.
+  `sync` and `build` refresh the data it shows without needing a rerun.
+- Calendar cards lead with the latest complete period, and draw partial periods as lighter bars.
+- Gaps in a line are days with no recorded data. Each chart has its own vertical scale, so compare numbers
+  rather than heights between packages.
+
 ## Missing data and completeness
 
 Every report follows the same rules:
@@ -251,6 +273,9 @@ Every report follows the same rules:
   remain as gaps.
 - The current UTC day is never stored because it is incomplete. PyPIStats does not say whether its newest
   earlier day is final; if that value is later revised, the next collection picks up the correction.
+- PyPIStats appears to leave out days with no downloads, rather than reporting `0`. Gaps seen so far are
+  all next to very low daily counts, so a low-traffic package may show "missing" days that were really
+  zero. This is an observation, not documented behavior, so these days are still treated as missing.
 - Requests retry up to 4 times on network errors, rate limiting and server errors, with backoff, honoring
   `Retry-After`. A `Retry-After` over 2 minutes fails that package rather than retrying early.
 
@@ -307,6 +332,9 @@ a final workflow step, or use `actions/upload-pages-artifact` for GitHub Pages:
           command: pages deploy public --project-name=my-stats
 ```
 
+To publish the [dashboard](#dashboard) too, add a `pypi-tracker dashboard` step before deploying, using the
+same `--config` and paths as `sync`. It's served from the same origin as the reports, so it doesn't need CORS.
+
 A browser on another origin can only read the JSON with CORS enabled. On Cloudflare Pages, add a
 `public/_headers` file; `build` leaves it in place:
 
@@ -317,5 +345,5 @@ A browser on another origin can only read the JSON with CORS enabled. On Cloudfl
 
 ## Not in scope
 
-No dashboard, database, hosted backend, REST server, authentication, package discovery, plugins, GitHub
+No database, hosted backend, REST server, authentication, package discovery, plugins, GitHub
 statistics or growth-rate reports.

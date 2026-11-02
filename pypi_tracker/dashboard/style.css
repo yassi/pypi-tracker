@@ -1,0 +1,300 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6f6d68;
+  --series: #2a78d6;
+  --grid: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --warning: #fab219;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #a3a29a;
+    --series: #3987e5;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  background: var(--page);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+header p,
+footer {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+footer {
+  margin-top: 32px;
+  font-size: 12px;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--series);
+  outline-offset: 2px;
+}
+
+/* Report buttons */
+
+#ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+
+#ranges button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+#ranges button[aria-pressed="true"] {
+  border-color: var(--text);
+  color: var(--text);
+  font-weight: 600;
+}
+
+#message {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+#message code {
+  overflow-wrap: anywhere;
+}
+
+/* Package cards */
+
+#cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  gap: 16px;
+}
+
+.card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.value {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.caption,
+.coverage,
+.note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.warning::before {
+  content: "⚠ ";
+}
+
+.warning {
+  color: var(--text);
+}
+
+.coverage {
+  margin-top: 12px;
+  color: var(--text-muted);
+}
+
+.note {
+  margin-top: 4px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  background: var(--series);
+  opacity: 0.4;
+}
+
+/* Charts */
+
+.chart {
+  margin-top: 16px;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+.grid {
+  stroke: var(--grid);
+}
+
+.axis-line {
+  stroke: var(--baseline);
+}
+
+.axis-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.line {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.area {
+  fill: var(--series);
+  opacity: 0.1;
+}
+
+.dot {
+  fill: var(--series);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.bar {
+  fill: var(--series);
+}
+
+.bar.partial {
+  opacity: 0.4;
+}
+
+.crosshair {
+  stroke: var(--text-muted);
+}
+
+.band {
+  fill: var(--text);
+  opacity: 0.06;
+}
+
+/* Tooltip */
+
+#tooltip {
+  position: fixed;
+  z-index: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-100%);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#tooltip strong {
+  display: block;
+  font-size: 14px;
+}
+
+#tooltip span {
+  display: block;
+  color: var(--text-secondary);
+}
+
+/* Data table */
+
+details {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+summary {
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.table-scroll {
+  max-height: 240px;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--grid);
+  text-align: left;
+  font-weight: 400;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

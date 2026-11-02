@@ -1,4 +1,4 @@
-"""The public Python API: collect, build, sync and validate."""
+"""The public Python API: collect, build, sync, dashboard and validate."""
 
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -96,6 +96,11 @@ class Tracker:
             self.build(package for package in self.packages if package not in failure.failures)
             raise
         return changed, self.build()
+
+    def dashboard(self) -> list[Path]:
+        """Build the reports, then the static page that charts them. Returns the changed files."""
+        written = self.build()
+        return written + reports.write_dashboard(self._selected(), self.output_dir, self.reports)
 
     def history(self, package: str) -> History:
         """Stored observations for a package as {date: downloads}."""

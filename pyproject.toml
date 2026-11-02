@@ -22,5 +22,8 @@ pypi-tracker = "pypi_tracker.cli:main"
 where = ["."]
 include = ["pypi_tracker*"]
 
+[tool.setuptools.package-data]
+"pypi_tracker.dashboard" = ["*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

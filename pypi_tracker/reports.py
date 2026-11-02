@@ -1,11 +1,15 @@
 """Shape aggregates into report payloads and publish them as static JSON files."""
 
+import html
 import json
 from pathlib import Path
 
 from . import aggregation
 from .config import ReportSettings
+from .errors import ConfigError
 from .storage import History, write_atomic
+
+_DASHBOARD_FILES = Path(__file__).parent / "dashboard"
 
 _CALENDAR = {
     "weekly": aggregation.weekly,
@@ -75,6 +79,29 @@ def write_reports(
             files[f"daily/{year}.json"] = json.dumps(payload, separators=(",", ":")) + "\n"
 
     root = output_dir / "packages" / package
+    return [root / name for name, text in files.items() if write_atomic(root / name, text)]
+
+
+def write_dashboard(packages: list[str], output_dir: Path, settings: ReportSettings) -> list[Path]:
+    """Write the static page that charts the reports and return the files that changed.
+
+    It gets its own folder so it can never overwrite a user's site at the output root.
+    """
+    if not settings.rolling_days and not settings.calendar:
+        raise ConfigError("nothing to chart: enable reports.rolling_days or reports.calendar")
+    config = {
+        "packages": packages,
+        "rolling_days": sorted(set(settings.rolling_days)),
+        "calendar": list(settings.calendar),
+        "summary": settings.summary,
+    }
+    page = (_DASHBOARD_FILES / "index.html").read_text(encoding="utf-8")
+    files = {
+        "index.html": page.replace("__CONFIG__", html.escape(json.dumps(config))),
+        "app.js": (_DASHBOARD_FILES / "app.js").read_text(encoding="utf-8"),
+        "style.css": (_DASHBOARD_FILES / "style.css").read_text(encoding="utf-8"),
+    }
+    root = output_dir / "dashboard"
     return [root / name for name, text in files.items() if write_atomic(root / name, text)]
 
 

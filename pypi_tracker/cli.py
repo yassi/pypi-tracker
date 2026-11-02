@@ -1,6 +1,7 @@
 """The `pypi-tracker` command line. All real work happens in Tracker."""
 
 import argparse
+import shlex
 import sys
 from collections.abc import Sequence
 from importlib.metadata import version
@@ -60,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     add("collect", _collect, "fetch observations and merge them into CSV storage", [source])
     add("build", _build, "generate JSON reports from stored history", [source, output])
     add("sync", _sync, "collect, then build", [source, output])
+    add("dashboard", _dashboard, "build reports and a static web page charting them", [source, output])
     add("validate", _validate, "check the historical dataset", [source])
 
     init = add("init", _init, "write an example configuration file", [])
@@ -93,6 +95,15 @@ def _build(args: argparse.Namespace) -> int:
 def _sync(args: argparse.Namespace) -> int:
     changed, written = _tracker(args).sync()
     print(f"synced: {len(changed)} package(s) changed, {len(written)} report file(s) changed")
+    return 0
+
+
+def _dashboard(args: argparse.Namespace) -> int:
+    tracker = _tracker(args)
+    tracker.dashboard()
+    print(f"wrote {tracker.output_dir / 'dashboard' / 'index.html'}")
+    print(f"preview: python -m http.server -d {shlex.quote(str(tracker.output_dir))}")
+    print("then open http://localhost:8000/dashboard/")
     return 0
 
 
