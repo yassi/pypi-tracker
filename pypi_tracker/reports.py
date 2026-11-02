@@ -142,8 +142,8 @@ def _render_page(
     description = html.escape(site.description)
     config = {"packages": packages, "rolling_days": sorted(set(reports.rolling_days))}
     values = {
-        "THEME": "" if site.theme == "auto" else f' data-theme="{site.theme}"',
-        "ACCENT": f' style="--accent: {site.accent_color}"' if site.accent_color else "",
+        "THEME": "" if site.theme == "auto" else f'data-theme="{site.theme}"',
+        "ACCENT": f'style="--accent: {site.accent_color}"' if site.accent_color else "",
         "GENERATOR": _GENERATOR_TAG,
         "TITLE": title,
         "META": f'<meta name="description" content="{description}">' if description else "",

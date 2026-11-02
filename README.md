@@ -2,6 +2,8 @@
 
 pypi-tracker is a lightweight tool for collecting and preserving PyPI package download statistics. It maintains historical data beyond [PyPIStats](https://pypistats.org)' retention window. It generates static, chart-ready JSON reports that can be used to visualize download trends, track package adoption, and power dashboards or other applications without a backend.
 
+![The pypi-tracker dashboard, showing total downloads, a download trend chart and a breakdown by package](https://raw.githubusercontent.com/yassi/pypi-tracker/main/images/dashboard.png)
+
 
 ## Try it
 
