@@ -158,8 +158,8 @@ async function viewFromPackages() {
   const empty = { dates: [], asOf: null, rows: [], failed, combined: new Map(), histories: null, summary: null };
   if (!withData.length) return { ...empty, total: tally(new Map(), []), previous: null };
 
-  // Every report ends on the latest date all selected packages share, so nothing looks like a drop.
-  const anchor = withData.map((summary) => summary.latest_date).sort()[0];
+  // Every report ends on the latest date any selected package has, matching aggregation.py.
+  const anchor = withData.map((summary) => summary.latest_date).sort().at(-1);
   const earliest = withData.map((summary) => summary.earliest_date).sort()[0];
   let start = earliest;
   let end = anchor;
@@ -246,14 +246,11 @@ function tally(history, dates) {
   };
 }
 
-// A date counts only when every package has it.
+// A date counts when any package has it; absent packages add nothing.
 function combine(histories) {
   const combined = new Map();
-  if (!histories.length) return combined;
-  for (const day of histories[0].keys()) {
-    if (histories.every((history) => history.has(day))) {
-      combined.set(day, histories.reduce((total, history) => total + history.get(day), 0));
-    }
+  for (const history of histories) {
+    for (const [day, downloads] of history) combined.set(day, (combined.get(day) ?? 0) + downloads);
   }
   return combined;
 }
@@ -536,7 +533,7 @@ function renderOverview() {
   ];
   byId("overview").replaceChildren(...boxes);
   if (dates.length && !total.complete) {
-    const scope = state.packages.length > 1 ? "every selected package" : "this package";
+    const scope = state.packages.length > 1 ? "any selected package" : "this package";
     const warning = element("p", "incomplete", `Incomplete: ${total.missing} of ${dates.length} days have no data for ${scope}. They are left out of these figures, not counted as zero.`);
     byId("overview").append(warning);
   }
@@ -892,7 +889,7 @@ function renderBreakdown() {
 
   const incomplete = rows.some((row) => row.missing) || !view.total.complete;
   byId("breakdown-note").textContent = incomplete
-    ? "Rows count each package's own recorded days, so with missing data they can add up to more than the total above. Change is shown only when both periods are complete."
+    ? "Rows count each package's own recorded days. Change is shown only when both periods are complete."
     : "";
 }
 

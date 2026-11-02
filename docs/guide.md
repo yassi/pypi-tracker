@@ -235,19 +235,15 @@ The identifier key is `week` (`"2026-W44"`), `month` (`"2026-10"`) or `year` (`2
 ## Aggregate reports
 
 `build` also writes the same reports for the whole collection to `aggregate/`, with `packages` (a list)
-in place of `package`. Two rules make them honest:
-
-- **A date counts only when every package has data for it.** Other dates are `null`, never a partial sum,
-  and rolling windows end on the latest date all packages share.
-- **Calendar reports keep every period since the first observation.** Periods from before a newer package
-  joined stay in the file, marked incomplete with their real `recorded_days`.
+in place of `package`. A date counts when any package has data for it: packages with no data that day
+add nothing, so a day's total can cover only some packages. Dates are `null` only when no package has them,
+and rolling windows end on the latest date of any package.
 
 Aggregate downloads are a sum of downloads, not unique installs or users.
 
 Aggregate rolling reports add `breakdown`, each package's own numbers for that window:
 `{package, downloads, recorded_days, missing_days, previous_downloads}`. Aggregate `summary.json` adds
-`first_observed_date`, the earliest date from any package. Rows count each package's own recorded days, so
-with missing data they can add up to more than the aggregate total.
+`first_observed_date`, the earliest date from any package.
 
 ## Dashboard
 

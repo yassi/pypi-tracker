@@ -48,15 +48,13 @@ def rolling_report(who: str | list[str], history: History, days: int) -> dict:
     }
 
 
-def calendar_report(
-    who: str | list[str], history: History, name: str, since: date | None = None
-) -> dict:
+def calendar_report(who: str | list[str], history: History, name: str) -> dict:
     """`name` is weekly, monthly or yearly."""
     return {
         **_subject(who),
         "report": name,
         "as_of": _as_of(history),
-        "periods": _CALENDAR[name](history, since),
+        "periods": _CALENDAR[name](history),
     }
 
 
@@ -91,20 +89,15 @@ def write_aggregate(
 ) -> list[Path]:
     """Write the same reports for the whole collection and return the files that changed.
 
-    A date counts only when every package has it, so reports end at the latest such date.
-    Calendar reports still list the periods before a newer package joined, marked incomplete.
+    A date counts when any package has it, so reports end at the latest date of any package.
     """
-    names = list(histories)
-    combined = aggregation.combine(histories.values())
-    observed = [day for history in histories.values() for day in history]
-    since = min(observed) if observed else None
-    payloads = _payloads(names, combined, settings, since)
+    payloads = _payloads(list(histories), aggregation.combine(histories.values()), settings)
 
     for days in settings.rolling_days:
         payload = payloads[f"last-{days}-days.json"]
         payload["breakdown"] = _breakdown(histories, payload["period"], payload["previous"])
     if settings.summary:
-        payloads["summary.json"]["first_observed_date"] = since.isoformat() if since else None
+        payloads["summary.json"]["first_observed_date"] = payloads["summary.json"]["earliest_date"]
     return _write_payloads(payloads, output_dir / "aggregate")
 
 
@@ -161,16 +154,14 @@ def _render_page(
     return re.sub(r"__([A-Z]+)__", lambda match: values[match[1]], page)
 
 
-def _payloads(
-    who: str | list[str], history: History, settings: ReportSettings, since: date | None = None
-) -> dict[str, dict]:
+def _payloads(who: str | list[str], history: History, settings: ReportSettings) -> dict[str, dict]:
     payloads: dict[str, dict] = {}
     if settings.summary:
         payloads["summary.json"] = summary_report(who, history)
     for days in settings.rolling_days:
         payloads[f"last-{days}-days.json"] = rolling_report(who, history, days)
     for name in settings.calendar:
-        payloads[f"{name}.json"] = calendar_report(who, history, name, since)
+        payloads[f"{name}.json"] = calendar_report(who, history, name)
     if "daily" in settings.historical:
         for year, payload in daily_reports(who, history).items():
             payloads[f"daily/{year}.json"] = payload

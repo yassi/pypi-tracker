@@ -10,12 +10,12 @@ _ONE_DAY = timedelta(days=1)
 
 
 def combine(histories: Iterable[History]) -> History:
-    """Add packages together, keeping only dates that every package has: missing is never zero."""
-    histories = list(histories)
-    if not histories:
-        return {}
-    dates = set.intersection(*(set(history) for history in histories))
-    return {day: sum(history[day] for history in histories) for day in dates}
+    """Add packages together. A date counts when any package has it; absent packages add nothing."""
+    combined: History = {}
+    for history in histories:
+        for day, downloads in history.items():
+            combined[day] = combined.get(day, 0) + downloads
+    return combined
 
 
 def tally(history: History, start: date, end: date) -> dict:
@@ -62,25 +62,25 @@ def rolling_window(history: History, days: int) -> dict:
     }
 
 
-def weekly(history: History, since: date | None = None) -> list[dict]:
-    """ISO calendar weeks, Monday through Sunday. `since` keeps earlier periods that have no data."""
+def weekly(history: History) -> list[dict]:
+    """ISO calendar weeks, Monday through Sunday."""
     return [
         {"week": "{}-W{:02d}".format(*start.isocalendar()[:2]), **tally(history, start, end)}
-        for start, end in _spans(history, _week_span, since)
+        for start, end in _spans(history, _week_span)
     ]
 
 
-def monthly(history: History, since: date | None = None) -> list[dict]:
+def monthly(history: History) -> list[dict]:
     return [
         {"month": f"{start:%Y-%m}", **tally(history, start, end)}
-        for start, end in _spans(history, _month_span, since)
+        for start, end in _spans(history, _month_span)
     ]
 
 
-def yearly(history: History, since: date | None = None) -> list[dict]:
+def yearly(history: History) -> list[dict]:
     return [
         {"year": start.year, **tally(history, start, end)}
-        for start, end in _spans(history, _year_span, since)
+        for start, end in _spans(history, _year_span)
     ]
 
 
@@ -123,13 +123,11 @@ def _dates(start: date, end: date) -> list[date]:
     return [start + _ONE_DAY * offset for offset in range((end - start).days + 1)]
 
 
-def _spans(
-    history: History, span: Callable[[date], tuple[date, date]], since: date | None = None
-) -> Iterator[tuple[date, date]]:
+def _spans(history: History, span: Callable[[date], tuple[date, date]]) -> Iterator[tuple[date, date]]:
     """Every period from the earliest to latest observation, including periods with no data."""
     if not history:
         return
-    day, last = since or min(history), max(history)
+    day, last = min(history), max(history)
     while day <= last:
         start, end = span(day)
         yield start, end

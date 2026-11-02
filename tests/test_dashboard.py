@@ -53,33 +53,40 @@ class TestAggregateReports:
         assert report["observations"][-1] == {"date": "2026-01-03", "downloads": 15}
         assert len(report["observations"]) == 7
 
-    def test_a_date_missing_from_one_package_is_never_a_partial_sum(self):
+    def test_a_date_missing_from_one_package_still_counts_the_others(self):
         foo = days("2026-01-01", 3)
         bar = days("2026-01-01", 3)
         del bar[date(2026, 1, 2)]
-        assert combine([foo, bar]) == {date(2026, 1, 1): 20, date(2026, 1, 3): 20}
+        assert combine([foo, bar]) == {date(2026, 1, 1): 20, date(2026, 1, 2): 10, date(2026, 1, 3): 20}
 
-    def test_rolling_ends_at_the_latest_date_all_packages_share(self, tmp_path):
+    def test_rolling_ends_at_the_latest_date_of_any_package(self, tmp_path):
         tracker = make_tracker(tmp_path, {"foo": days("2026-01-01", 10), "stale": days("2026-01-01", 5)})
         tracker.build()
         report = aggregate(tracker, "last-7-days.json")
-        assert report["as_of"] == "2026-01-05"
-        assert report["period"]["end"] == "2026-01-05"
-        assert (report["recorded_days"], report["missing_days"], report["complete"]) == (5, 2, False)
-        assert report["observations"][0] == {"date": "2025-12-30", "downloads": None}
+        assert report["as_of"] == "2026-01-10"
+        assert report["period"]["end"] == "2026-01-10"
+        assert (report["recorded_days"], report["missing_days"], report["complete"]) == (7, 0, True)
+        assert report["observations"][0] == {"date": "2026-01-04", "downloads": 20}
+        assert report["observations"][-1] == {"date": "2026-01-10", "downloads": 10}
 
-    def test_calendar_keeps_periods_from_before_a_new_package_marked_incomplete(self, tmp_path):
+    def test_calendar_counts_periods_from_before_a_new_package(self, tmp_path):
         tracker = make_tracker(tmp_path, {"old": days("2026-01-01", 90), "new": days("2026-03-15", 17)})
         tracker.build()
         january, february, march = aggregate(tracker, "monthly.json")["periods"]
-        assert (january["month"], january["downloads"], january["recorded_days"]) == ("2026-01", None, 0)
-        assert january["complete"] is False
-        assert (february["month"], february["downloads"]) == ("2026-02", None)
-        assert (march["month"], march["recorded_days"], march["complete"]) == ("2026-03", 17, False)
+        assert (january["month"], january["downloads"], january["complete"]) == ("2026-01", 310, True)
+        assert (february["month"], february["downloads"]) == ("2026-02", 280)
+        assert (march["month"], march["downloads"], march["complete"]) == ("2026-03", 480, True)
         assert aggregate(tracker, "summary.json")["first_observed_date"] == "2026-01-01"
 
-    def test_no_shared_date_is_an_unavailable_report_not_a_misleading_one(self, tmp_path):
+    def test_packages_with_no_shared_date_still_combine(self, tmp_path):
         tracker = make_tracker(tmp_path, {"a": days("2026-01-01", 2), "b": days("2026-02-01", 2)})
+        tracker.build()
+        report = aggregate(tracker, "last-30-days.json")
+        assert (report["as_of"], report["downloads"], report["recorded_days"]) == ("2026-02-02", 20, 2)
+        assert [period["downloads"] for period in aggregate(tracker, "monthly.json")["periods"]] == [20, 20]
+
+    def test_no_data_at_all_is_an_unavailable_report(self, tmp_path):
+        tracker = make_tracker(tmp_path, {"a": {}, "b": {}})
         tracker.build()
         report = aggregate(tracker, "last-30-days.json")
         assert (report["as_of"], report["downloads"], report["complete"]) == (None, None, False)
