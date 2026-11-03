@@ -24,6 +24,7 @@ const hiddenSeries = new Set();
 const sort = { key: "downloads", descending: true };
 const jsonCache = new Map();
 let view = null; // the data currently on screen
+let collectionSummary = null; // aggregate/summary.json
 let drawn = null; // the chart currently on screen
 let renderCount = 0;
 let controlUpdates = [];
@@ -921,6 +922,46 @@ function breakdownRow(row) {
   return tr;
 }
 
+// ----- Report links -----
+
+// The JSON files behind this view: one package's own, or else the whole collection's.
+function renderReports() {
+  const name = state.packages.length === 1 ? state.packages[0] : null;
+  const summary = name ? view.summary : collectionSummary;
+  const years = [];
+  if (summary?.earliest_date) {
+    for (let year = Number(summary.earliest_date.slice(0, 4)); year <= Number(summary.latest_date.slice(0, 4)); year += 1) years.push(year);
+  }
+  const groups = [
+    ["Summary", ["summary"]],
+    ["Rolling", config.rolling_days.map((days) => `last-${days}-days`)],
+    ["Calendar", config.calendar],
+    ["Daily", years.map((year) => `daily/${year}`)],
+  ];
+  const folder = name ? `packages/${name}/` : "aggregate/";
+  byId("reports-note").textContent = name
+    ? `JSON files for ${name} in ${folder}, for use in your own tools.`
+    : `JSON files for all packages combined in ${folder}, for use in your own tools. Choose one package to see its own files.`;
+  byId("reports").replaceChildren(
+    ...groups.filter(([, files]) => files.length).flatMap(([label, files]) => {
+      const list = element("ul", "report-links");
+      for (const file of files) {
+        const path = name ? packagePath(name, file) : `aggregate/${file}.json`;
+        // The folder is named once above, so each link shows only its file name.
+        const link = element("a", "", `${file.split("/").at(-1)}.json`);
+        link.href = path;
+        link.title = decodeURIComponent(path);
+        const item = element("li");
+        item.append(link);
+        list.append(item);
+      }
+      const links = element("dd");
+      links.append(list);
+      return [element("dt", "", label), links];
+    }),
+  );
+}
+
 // ----- Startup -----
 
 async function render() {
@@ -937,6 +978,7 @@ async function render() {
   renderOverview();
   renderChart();
   renderBreakdown();
+  renderReports();
   byId("main").setAttribute("aria-busy", "false");
 }
 
@@ -949,7 +991,8 @@ async function start() {
     byId("main").setAttribute("aria-busy", "false");
     return;
   }
-  buildControls(await loadJson("aggregate/summary.json"));
+  collectionSummary = await loadJson("aggregate/summary.json");
+  buildControls(collectionSummary);
   await render();
 
   let lastWidth = byId("chart").clientWidth;

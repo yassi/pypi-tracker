@@ -716,6 +716,45 @@ th[aria-sort] .sort {
   opacity: 0.55;
 }
 
+.reports-note {
+  margin: 0 0 12px;
+}
+
+.report-groups {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 24px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.report-groups dt {
+  color: var(--text-muted);
+}
+
+.report-groups dd {
+  margin: 0;
+}
+
+.report-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.report-links a {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.report-links a:hover {
+  color: var(--text);
+}
+
 .site-footer {
   color: var(--text-muted);
   font-size: 12px;
@@ -744,6 +783,15 @@ th[aria-sort] .sort {
 
   .panel {
     padding: 14px;
+  }
+
+  .report-groups {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .report-groups dd + dt {
+    margin-top: 8px;
   }
 
   .menu {

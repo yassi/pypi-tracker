@@ -133,7 +133,7 @@ def _render_page(
 ) -> str:
     title = html.escape(site.title)
     description = html.escape(site.description)
-    config = {"packages": packages, "rolling_days": sorted(set(reports.rolling_days))}
+    config = {"packages": packages, "rolling_days": sorted(set(reports.rolling_days)), "calendar": list(reports.calendar)}
     values = {
         "THEME": "" if site.theme == "auto" else f'data-theme="{site.theme}"',
         "ACCENT": f'style="--accent: {site.accent_color}"' if site.accent_color else "",

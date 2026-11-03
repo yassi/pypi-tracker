@@ -171,7 +171,7 @@ class TestSite:
             tmp_path, {"foo": days("2026-01-01", 1)}, reports=ReportSettings(rolling_days=[30, 7, 30], calendar=[])
         )
         tracker.dashboard()
-        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30]}
+        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30], "calendar": []}
 
     def test_without_a_package_list_it_charts_everything_stored(self, tmp_path):
         write_history(tmp_path / "d" / "b.csv", days("2026-01-01", 1))

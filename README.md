@@ -119,3 +119,20 @@ further than PyPIStats did on your first run, so totals are "recorded" downloads
 
 The [guide](docs/guide.md) covers configuration, every report format, the Python API, and GitHub Actions and
 Cloudflare Pages setup.
+
+## Available reports
+
+`build` writes these JSON files for each package to `public/packages/<package>/`, and for all packages
+combined to `public/aggregate/`. The `[reports]` config section chooses which are generated.
+
+| File | Contents |
+|---|---|
+| `summary.json` | First and last recorded dates, total recorded downloads and any coverage gaps. |
+| `last-7-days.json`, `last-30-days.json`, `last-90-days.json`, `last-180-days.json` | Rolling windows: a total plus one observation per day, ending at the latest recorded date. One file per entry in `rolling_days`. |
+| `weekly.json` | Totals for every ISO week, Monday through Sunday. |
+| `monthly.json` | Totals for every calendar month. |
+| `yearly.json` | Totals for every calendar year. |
+| `daily/<year>.json` | Every recorded day in that year, such as `daily/2026.json`. |
+
+Aggregate rolling reports also include `breakdown`, each package's own numbers for that window. The
+dashboard links to the files behind whatever it is showing.
