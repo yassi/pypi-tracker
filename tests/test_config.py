@@ -44,6 +44,7 @@ def test_omitted_report_keys_use_defaults(tmp_path):
     config = load_config(write(tmp_path, 'packages = ["foo"]\n[reports]\nsummary = false\n'))
     assert config.reports.rolling_days == (7, 30, 90, 180)
     assert config.reports.summary is False
+    assert config.reports.aggregate is True
 
 
 @pytest.mark.parametrize(
@@ -61,6 +62,7 @@ def test_omitted_report_keys_use_defaults(tmp_path):
         ('[reports]\ncalendar = ["hourly"]\n', "unknown report"),
         ('[reports]\nhistorical = ["weekly"]\n', "unknown report"),
         ('[reports]\nsummary = "yes"\n', "true or false"),
+        ('[reports]\naggregate = 1\n', "reports.aggregate must be true or false"),
         ("[storage]\ndirectory = 3\n", "must be a path"),
         ('storage = "data/"\n', "must be a mapping"),
         ("packages = [\n", "invalid TOML"),

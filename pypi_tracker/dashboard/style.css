@@ -716,6 +716,22 @@ th[aria-sort] .sort {
   opacity: 0.55;
 }
 
+.package-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.package-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grid);
+  overflow-wrap: anywhere;
+}
+
+.package-list li:last-child {
+  border-bottom: 0;
+}
+
 .reports-note {
   margin: 0 0 12px;
 }

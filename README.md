@@ -74,6 +74,7 @@ rolling_days = [7, 30, 90, 180]
 calendar = ["weekly", "monthly", "yearly"]
 historical = ["daily"]
 summary = true
+aggregate = true  # also report all packages combined
 
 [dashboard]
 enabled = true
@@ -123,7 +124,7 @@ Cloudflare Pages setup.
 ## Available reports
 
 `build` writes these JSON files for each package to `public/packages/<package>/`, and for all packages
-combined to `public/aggregate/`. The `[reports]` config section chooses which are generated.
+combined to `public/aggregate/` unless `aggregate = false`. The `[reports]` config section chooses which are generated.
 
 | File | Contents |
 |---|---|

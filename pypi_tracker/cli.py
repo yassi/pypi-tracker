@@ -20,6 +20,7 @@ rolling_days = [7, 30, 90, 180]
 calendar = ["weekly", "monthly", "yearly"]
 historical = ["daily"]
 summary = true
+aggregate = true
 
 [dashboard]
 enabled = true

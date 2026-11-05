@@ -112,17 +112,30 @@ function rangeDays() {
 }
 
 async function loadView() {
+  if (listOnly()) return null; // the list needs only the package names, which the page already has
   const days = rangeDays();
   const canUseAggregate =
-    allSelected() && config.packages.length > 1 && state.view === "combined" && config.rolling_days.includes(days);
+    config.aggregate && allSelected() && config.packages.length > 1 && state.view === "combined" && config.rolling_days.includes(days);
   if (canUseAggregate) {
     const report = await loadJson(`aggregate/last-${days}-days.json`);
-    if (report?.as_of && report.breakdown) return viewFromAggregate(report);
+    if (report?.as_of && report.breakdown) return viewFromRolling(report);
+  }
+  // One package over a configured window: its own rolling report has everything, so skip the daily files.
+  if (state.packages.length === 1 && config.rolling_days.includes(days)) {
+    const name = state.packages[0];
+    const [summary, report] = await Promise.all([loadJson(packagePath(name, "summary")), loadJson(packagePath(name, `last-${days}-days`))]);
+    if (summary && report) return viewFromRolling(report, summary);
   }
   return viewFromPackages();
 }
 
-function viewFromAggregate(report) {
+// Without aggregate reports there is no collection-wide view: just a list of packages to drill into.
+function listOnly() {
+  return !config.aggregate && state.packages.length > 1;
+}
+
+// A view from one rolling report: the aggregate's (with its breakdown) or a single package's.
+function viewFromRolling(report, summary = null) {
   const known = report.observations.filter((day) => day.downloads !== null);
   return {
     dates: report.observations.map((day) => day.date),
@@ -137,7 +150,7 @@ function viewFromAggregate(report) {
     },
     previous: report.previous?.complete ? report.previous.downloads : null,
     compareLabel: `previous ${report.period.days} days`,
-    rows: report.breakdown.map((row) => ({
+    rows: (report.breakdown ?? []).map((row) => ({
       name: row.package,
       downloads: row.downloads,
       recorded: row.recorded_days,
@@ -145,7 +158,7 @@ function viewFromAggregate(report) {
       previous: row.previous_downloads,
     })),
     failed: [],
-    summary: null,
+    summary,
   };
 }
 
@@ -922,6 +935,21 @@ function breakdownRow(row) {
   return tr;
 }
 
+// ----- Package list -----
+
+function renderPackageList() {
+  byId("package-list").replaceChildren(
+    ...state.packages.map((name) => {
+      const open = element("button", "link-button", name);
+      open.type = "button";
+      open.addEventListener("click", () => selectPackages([name]));
+      const item = element("li");
+      item.append(open);
+      return item;
+    }),
+  );
+}
+
 // ----- Report links -----
 
 // The JSON files behind this view: one package's own, or else the whole collection's.
@@ -974,12 +1002,20 @@ async function render() {
   if (current !== renderCount) return; // a newer choice has already taken over
   view = loaded;
   controlUpdates.forEach((update) => update());
-  renderMessages();
+  const list = listOnly();
+  for (const id of ["controls", "overview", "chart-panel", "breakdown-panel", "reports-panel"]) byId(id).hidden = list;
+  byId("package-list-panel").hidden = !list;
   renderDetail();
-  renderOverview();
-  renderChart();
-  renderBreakdown();
-  renderReports();
+  if (list) {
+    showMessage("");
+    renderPackageList();
+  } else {
+    renderMessages();
+    renderOverview();
+    renderChart();
+    renderBreakdown();
+    renderReports();
+  }
   byId("main").setAttribute("aria-busy", "false");
 }
 
@@ -992,7 +1028,7 @@ async function start() {
     byId("main").setAttribute("aria-busy", "false");
     return;
   }
-  collectionSummary = await loadJson("aggregate/summary.json");
+  collectionSummary = config.aggregate ? await loadJson("aggregate/summary.json") : null;
   buildControls(collectionSummary);
   await render();
 

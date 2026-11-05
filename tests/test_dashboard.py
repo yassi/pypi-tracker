@@ -113,6 +113,13 @@ class TestAggregateReports:
             tracker.build()
         assert not (tracker.output_dir / "aggregate").exists()
 
+    def test_can_be_turned_off(self, tmp_path):
+        tracker = make_tracker(tmp_path, {"foo": days("2026-01-01", 3)}, reports=ReportSettings(aggregate=False))
+        tracker.dashboard()
+        assert not (tracker.output_dir / "aggregate").exists()
+        assert (tracker.output_dir / "packages" / "foo" / "summary.json").exists()
+        assert page_config(tracker)["aggregate"] is False
+
     def test_makes_no_network_requests(self, tracker, api):
         tracker.dashboard()
         assert api.requests == []
@@ -171,7 +178,7 @@ class TestSite:
             tmp_path, {"foo": days("2026-01-01", 1)}, reports=ReportSettings(rolling_days=[30, 7, 30], calendar=[])
         )
         tracker.dashboard()
-        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30], "calendar": []}
+        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30], "calendar": [], "aggregate": True}
 
     def test_without_a_package_list_it_charts_everything_stored(self, tmp_path):
         write_history(tmp_path / "d" / "b.csv", days("2026-01-01", 1))

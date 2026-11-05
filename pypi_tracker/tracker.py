@@ -75,7 +75,8 @@ class Tracker:
         """Generate JSON reports from local CSVs and return the files that changed.
 
         Never touches the network. Raises PartialFailure after trying every package.
-        Collection-wide output is only written when building every package, with no failures.
+        Collection-wide output is only written when building every package, with no failures, and
+        aggregate reports only when `reports.aggregate` is on.
         """
         written, failures, histories = [], {}, {}
         for package in self._selected() if packages is None else packages:
@@ -89,7 +90,8 @@ class Tracker:
         if failures:
             raise PartialFailure("report generation", failures)
         if packages is None:
-            written += reports.write_aggregate(histories, self.output_dir, self.reports)
+            if self.reports.aggregate:
+                written += reports.write_aggregate(histories, self.output_dir, self.reports)
             if self.site.enabled:
                 written += self._write_site()
         return written

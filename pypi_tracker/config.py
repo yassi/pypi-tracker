@@ -27,6 +27,7 @@ class ReportSettings:
     calendar: Sequence[str] = CALENDAR_REPORTS
     historical: Sequence[str] = HISTORICAL_REPORTS
     summary: bool = True
+    aggregate: bool = True
 
     def __post_init__(self):
         _require_list("reports.rolling_days", self.rolling_days)
@@ -35,8 +36,9 @@ class ReportSettings:
                 raise ConfigError(f"reports.rolling_days must be positive integers, got {days!r}")
         _require_choices("reports.calendar", self.calendar, CALENDAR_REPORTS)
         _require_choices("reports.historical", self.historical, HISTORICAL_REPORTS)
-        if type(self.summary) is not bool:
-            raise ConfigError(f"reports.summary must be true or false, got {self.summary!r}")
+        for name in ("summary", "aggregate"):
+            if type(getattr(self, name)) is not bool:
+                raise ConfigError(f"reports.{name} must be true or false, got {getattr(self, name)!r}")
 
 
 @dataclass(frozen=True)
@@ -112,7 +114,7 @@ def _parse(raw: dict, base: Path) -> Config:
     packages = raw.get("packages") or []
     _require_list("packages", packages)
 
-    reports = _section(raw, "reports", {"rolling_days", "calendar", "historical", "summary"})
+    reports = _section(raw, "reports", {"rolling_days", "calendar", "historical", "summary", "aggregate"})
     dashboard = _section(
         raw, "dashboard", {"enabled", "title", "description", "logo", "theme", "accent_color"}
     )

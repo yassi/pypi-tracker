@@ -39,6 +39,7 @@ rolling_days = [7, 30, 90, 180]                   # any positive integers
 calendar = ["weekly", "monthly", "yearly"]
 historical = ["daily"]
 summary = true
+aggregate = true                                  # also report all packages combined, in aggregate/
 
 [storage]
 directory = "data/"
@@ -242,7 +243,9 @@ in place of `package`. A date counts when any package has data for it: packages 
 add nothing, so a day's total can cover only some packages. Dates are `null` only when no package has them,
 and rolling windows end on the latest date of any package.
 
-Aggregate downloads are a sum of downloads, not unique installs or users.
+Aggregate downloads are a sum of downloads, not unique installs or users. Set `aggregate = false` in
+`[reports]` to skip them. Files already in `aggregate/` are left in place, but the dashboard stops using
+them.
 
 Aggregate rolling reports add `breakdown`, each package's own numbers for that window:
 `{package, downloads, recorded_days, missing_days, previous_downloads}`. Aggregate `summary.json` adds
@@ -303,6 +306,8 @@ accent_color = "#6366f1"
 - It doesn't work when opened directly from disk, because browsers block those requests.
 - Selections are kept in the URL, such as `?range=90d&packages=foo,bar&granularity=weekly`, so views can
   be shared. `view=packages` shows one line per package, up to the eight largest.
+- With `aggregate = false`, the dashboard never shows a combined total. Its first view is just the list
+  of package names, which loads no data, and choosing one opens its charts.
 - The first view loads only `aggregate/summary.json` and one rolling report. Other views fetch each
   selected package's yearly files and are combined in the browser.
 - Average and change figures use recorded days only. Change is shown only when both periods are complete.

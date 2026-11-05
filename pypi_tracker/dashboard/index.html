@@ -34,7 +34,7 @@
     <section id="detail" class="detail" hidden></section>
     <section id="overview" class="overview" aria-label="Summary"></section>
 
-    <section class="panel">
+    <section id="chart-panel" class="panel">
       <div class="panel-head">
         <h2>Download trend</h2>
         <div id="chart-controls" class="controls"></div>
@@ -58,7 +58,14 @@
       <p id="breakdown-note" class="note"></p>
     </section>
 
-    <section class="panel">
+    <section id="package-list-panel" class="panel" hidden>
+      <div class="panel-head">
+        <h2>Packages</h2>
+      </div>
+      <ul id="package-list" class="package-list"></ul>
+    </section>
+
+    <section id="reports-panel" class="panel">
       <div class="panel-head">
         <h2>Reports</h2>
       </div>
