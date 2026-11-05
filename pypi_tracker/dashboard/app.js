@@ -27,6 +27,7 @@ let view = null; // the data currently on screen
 let collectionSummary = null; // aggregate/summary.json
 let drawn = null; // the chart currently on screen
 let renderCount = 0;
+let shownSelection = null; // the packages whose figures are on screen
 let controlUpdates = [];
 
 // ----- URL state -----
@@ -506,7 +507,7 @@ function renderMessages() {
   showMessage(notes.join(" "));
 }
 
-function renderDetail() {
+function renderDetail(summary) {
   const section = byId("detail");
   const name = state.packages.length === 1 ? state.packages[0] : null;
   section.hidden = !name;
@@ -519,8 +520,8 @@ function renderDetail() {
   link.href = `https://pypi.org/project/${encodeURIComponent(name)}/`;
   title.append(link);
   const facts = element("p", "note");
-  if (view.summary?.earliest_date) {
-    facts.textContent = `Recorded from ${formatDate(view.summary.earliest_date)} to ${formatDate(view.summary.latest_date)}`;
+  if (summary?.earliest_date) {
+    facts.textContent = `Recorded from ${formatDate(summary.earliest_date)} to ${formatDate(summary.latest_date)}`;
   }
   section.replaceChildren(back, title, facts);
 }
@@ -851,7 +852,6 @@ function hideTooltip() {
 // ----- Breakdown table -----
 
 function renderBreakdown() {
-  byId("breakdown-panel").hidden = state.packages.length === 1; // the package's own page already says it all
   const total = view.rows.reduce((sum, row) => sum + (row.downloads ?? 0), 0);
   const rows = view.rows.map((row) => ({
     ...row,
@@ -993,19 +993,45 @@ function renderReports() {
 
 // ----- Startup -----
 
+function applyLayout() {
+  const list = listOnly();
+  for (const id of ["controls", "overview", "chart-panel", "reports-panel"]) byId(id).hidden = list;
+  byId("breakdown-panel").hidden = list || state.packages.length === 1; // a package's own page already says it all
+  byId("package-list-panel").hidden = !list;
+}
+
+// A new selection gets its own layout at once, with placeholders, instead of the old figures while it loads.
+function showPlaceholders() {
+  applyLayout();
+  renderDetail(null);
+  showMessage("");
+  drawn = null;
+  byId("overview").replaceChildren();
+  byId("legend").replaceChildren();
+  byId("chart").replaceChildren(element("p", "state", "Loading…"));
+  byId("chart-note").textContent = "";
+  byId("chart-table").replaceChildren();
+  byId("breakdown").replaceChildren();
+  byId("breakdown-note").textContent = "";
+  byId("reports").replaceChildren();
+  byId("reports-note").textContent = "";
+}
+
 async function render() {
   const current = ++renderCount;
+  const selection = state.packages.join(",");
   writeUrl();
   controlUpdates.forEach((update) => update());
+  if (selection !== shownSelection) showPlaceholders();
   byId("main").setAttribute("aria-busy", "true");
   const loaded = await loadView();
   if (current !== renderCount) return; // a newer choice has already taken over
   view = loaded;
+  shownSelection = selection;
   controlUpdates.forEach((update) => update());
   const list = listOnly();
-  for (const id of ["controls", "overview", "chart-panel", "breakdown-panel", "reports-panel"]) byId(id).hidden = list;
-  byId("package-list-panel").hidden = !list;
-  renderDetail();
+  applyLayout();
+  renderDetail(view?.summary);
   if (list) {
     showMessage("");
     renderPackageList();

@@ -478,9 +478,45 @@ main[aria-busy="true"] .panel {
   transition: opacity 0.15s 0.15s;
 }
 
+/* A bar along the top of the window while data loads, shown only if loading takes a moment */
+main[aria-busy="true"]::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+  background-size: 50% 100%;
+  opacity: 0;
+  animation: loading-appear 0s 0.15s forwards, loading-sweep 1.2s 0.15s linear infinite;
+}
+
+@keyframes loading-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes loading-sweep {
+  from {
+    background-position: -100% 0;
+  }
+
+  to {
+    background-position: 200% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+  }
+
+  main[aria-busy="true"]::before {
+    background: var(--accent);
+    animation: loading-appear 0s 0.15s forwards;
   }
 }
 
