@@ -78,6 +78,9 @@ class Tracker:
         Collection-wide output is only written when building every package, with no failures, and
         aggregate reports only when `reports.aggregate` is on.
         """
+        return self._build(packages, site=self.site.enabled)
+
+    def _build(self, packages: Iterable[str] | None, site: bool) -> list[Path]:
         written, failures, histories = [], {}, {}
         for package in self._selected() if packages is None else packages:
             try:
@@ -92,8 +95,8 @@ class Tracker:
         if packages is None:
             if self.reports.aggregate:
                 written += reports.write_aggregate(histories, self.output_dir, self.reports)
-            if self.site.enabled:
-                written += self._write_site()
+            if site:
+                written += self._write_site(histories)
         return written
 
     def sync(self) -> tuple[list[str], list[Path]]:
@@ -111,7 +114,7 @@ class Tracker:
 
     def dashboard(self) -> list[Path]:
         """Build the reports, then the static site that charts them. Returns the changed files."""
-        return self.build() + self._write_site()
+        return self._build(None, site=True)
 
     def history(self, package: str) -> History:
         """Stored observations for a package as {date: downloads}."""
@@ -129,8 +132,9 @@ class Tracker:
             }
         return results
 
-    def _write_site(self) -> list[Path]:
-        return reports.write_site(self._selected(), self.output_dir, self.reports, self.site)
+    def _write_site(self, histories: dict[str, History]) -> list[Path]:
+        latest = max((max(history) for history in histories.values() if history), default=None)
+        return reports.write_site(self._selected(), self.output_dir, self.reports, self.site, latest)
 
     def _collect_one(self, package: str) -> bool:
         path = self._csv_path(package)

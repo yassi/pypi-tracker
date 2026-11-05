@@ -120,6 +120,16 @@ class TestAggregateReports:
         assert (tracker.output_dir / "packages" / "foo" / "summary.json").exists()
         assert page_config(tracker)["aggregate"] is False
 
+    def test_header_shows_the_newest_data_date(self, tmp_path):
+        tracker = make_tracker(tmp_path, {"foo": days("2026-01-01", 3), "bar": days("2026-01-01", 9)}, reports=ReportSettings(aggregate=False))
+        tracker.dashboard()
+        assert '<p class="updated">Data through <time datetime="2026-01-09">Jan 9, 2026</time></p>' in page_text(tracker)
+
+    def test_no_data_shows_no_date(self, tmp_path):
+        tracker = make_tracker(tmp_path, {"foo": {}})
+        tracker.dashboard()
+        assert "Data through" not in page_text(tracker)
+
     def test_makes_no_network_requests(self, tracker, api):
         tracker.dashboard()
         assert api.requests == []

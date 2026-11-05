@@ -306,6 +306,8 @@ accent_color = "#6366f1"
 - It doesn't work when opened directly from disk, because browsers block those requests.
 - Selections are kept in the URL, such as `?range=90d&packages=foo,bar&granularity=weekly`, so views can
   be shared. `view=packages` shows one line per package, up to the eight largest.
+- The header says "Data through" the newest date any package has data for. It is the data's date, not
+  when the site was built, so the page only changes when the data does.
 - With `aggregate = false`, the dashboard never shows a combined total. Its first view is just the list
   of package names, which loads no data, and choosing one opens its charts.
 - The first view loads only `aggregate/summary.json` and one rolling report. Other views fetch each

@@ -141,6 +141,11 @@ summary {
   font-size: 13px;
 }
 
+.identity .updated {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .logo {
   flex: none;
   display: block;

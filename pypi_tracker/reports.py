@@ -123,9 +123,17 @@ def write_aggregate(
 
 
 def write_site(
-    packages: list[str], output_dir: Path, reports: ReportSettings, site: DashboardSettings
+    packages: list[str],
+    output_dir: Path,
+    reports: ReportSettings,
+    site: DashboardSettings,
+    latest: date | None = None,
 ) -> list[Path]:
-    """Write the static site that charts the reports and return the files that changed."""
+    """Write the static site that charts the reports and return the files that changed.
+
+    `latest` is the newest date with data. The page shows it rather than when it was built, so the
+    page only changes when the data does.
+    """
     if "daily" not in reports.historical or not reports.summary:
         raise ConfigError('the dashboard needs reports.historical = ["daily"] and reports.summary = true')
 
@@ -145,12 +153,12 @@ def write_site(
             files[logo_url] = logo.read_bytes()
         except OSError as error:
             raise ConfigError(f"cannot read dashboard.logo {logo}: {error}") from error
-    files["index.html"] = _render_page(packages, reports, site, logo_url)
+    files["index.html"] = _render_page(packages, reports, site, logo_url, latest)
     return [output_dir / name for name, content in files.items() if write_atomic(output_dir / name, content)]
 
 
 def _render_page(
-    packages: list[str], reports: ReportSettings, site: DashboardSettings, logo_url: str | None
+    packages: list[str], reports: ReportSettings, site: DashboardSettings, logo_url: str | None, latest: date | None
 ) -> str:
     title = html.escape(site.title)
     description = html.escape(site.description)
@@ -169,6 +177,11 @@ def _render_page(
             else f'<span class="monogram" aria-hidden="true">{html.escape(site.title[:1].upper())}</span>'
         ),
         "DESCRIPTION": f"<p>{description}</p>" if description else "",
+        "UPDATED": (
+            f'<p class="updated">Data through <time datetime="{latest.isoformat()}">{latest:%b} {latest.day}, {latest.year}</time></p>'
+            if latest
+            else ""
+        ),
     }
     page = (_SITE_FILES / "index.html").read_text(encoding="utf-8")
     # One pass, so a title containing a placeholder's name can't be replaced a second time.
