@@ -17,6 +17,9 @@ LOGO_TYPES = (".svg", ".png", ".webp")
 
 # Names become file paths, so this also blocks path traversal.
 _PACKAGE_NAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
+_COLLECTION_NAME = re.compile(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?")
+# The dashboard groups packages that are in no collection under this name.
+OTHER_COLLECTION = "other"
 
 
 @dataclass(frozen=True)
@@ -71,12 +74,38 @@ class DashboardSettings:
 
 
 @dataclass(frozen=True)
+class Collection:
+    """A named group of packages. Only with `aggregate` does it get combined reports and totals."""
+
+    name: str
+    packages: Sequence[str]
+    title: str | None = None
+    aggregate: bool = False
+
+    def __post_init__(self):
+        if not isinstance(self.name, str) or not _COLLECTION_NAME.fullmatch(self.name):
+            raise ConfigError(f"collection names must be lowercase letters, digits and dashes, got {self.name!r}")
+        if self.name == OTHER_COLLECTION:
+            raise ConfigError(f"collection name {OTHER_COLLECTION!r} is reserved for packages in no collection")
+        where = f"collections.{self.name}"
+        _require_list(f"{where}.packages", self.packages)
+        if not self.packages:
+            raise ConfigError(f"{where}.packages must list at least one package")
+        object.__setattr__(self, "packages", tuple(normalize_packages(self.packages)))
+        if self.title is not None and not isinstance(self.title, str):
+            raise ConfigError(f"{where}.title must be text, got {self.title!r}")
+        if type(self.aggregate) is not bool:
+            raise ConfigError(f"{where}.aggregate must be true or false, got {self.aggregate!r}")
+
+
+@dataclass(frozen=True)
 class Config:
     packages: list[str]
     reports: ReportSettings
     dashboard: DashboardSettings
     data_dir: Path | None
     output_dir: Path | None
+    collections: list[Collection]
 
 
 def normalize_packages(names: Iterable[str]) -> list[str]:
@@ -109,12 +138,25 @@ def load_config(path: str | Path) -> Config:
 
 
 def _parse(raw: dict, base: Path) -> Config:
-    _reject_unknown_keys("top level", raw, {"packages", "reports", "dashboard", "storage", "output"})
+    _reject_unknown_keys("top level", raw, {"packages", "reports", "dashboard", "storage", "output", "collections"})
 
     packages = raw.get("packages") or []
     _require_list("packages", packages)
 
     reports = _section(raw, "reports", {"rolling_days", "calendar", "historical", "summary", "aggregate"})
+    tables = raw.get("collections") or {}
+    if not isinstance(tables, dict):
+        raise ConfigError("'collections' must be a mapping")
+    collections = []
+    for name, table in tables.items():
+        if not isinstance(table, dict):
+            raise ConfigError(f"'collections.{name}' must be a mapping")
+        _reject_unknown_keys(f"collections.{name}", table, {"title", "packages", "aggregate"})
+        if "packages" not in table:
+            raise ConfigError(f"collections.{name}.packages is required")
+        collections.append(Collection(name=name, **table))
+    if collections and "aggregate" in reports:
+        raise ConfigError("reports.aggregate doesn't apply with [collections]; set aggregate on each collection instead")
     dashboard = _section(
         raw, "dashboard", {"enabled", "title", "description", "logo", "theme", "accent_color"}
     )
@@ -126,6 +168,7 @@ def _parse(raw: dict, base: Path) -> Config:
         dashboard=DashboardSettings(**dashboard),
         data_dir=_directory(raw, "storage", base),
         output_dir=_directory(raw, "output", base),
+        collections=collections,
     )
 
 

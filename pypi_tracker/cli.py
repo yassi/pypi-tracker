@@ -22,6 +22,13 @@ historical = ["daily"]
 summary = true
 aggregate = true
 
+# Optional: split packages into collections. With collections, set aggregate on each one
+# (and remove aggregate from [reports] above).
+# [collections.my-product]
+# title = "My product"
+# packages = ["example-package"]
+# aggregate = true
+
 [dashboard]
 enabled = true
 title = "PyPI Package Statistics"

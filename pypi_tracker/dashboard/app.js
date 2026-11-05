@@ -1,7 +1,8 @@
 // Draws the dashboard from the JSON reports `pypi-tracker build` writes. No dependencies or build step.
 //
-// The default view loads one small aggregate report. Anything else (a subset of packages, a long
-// range, one line per package) fetches each package's yearly files and combines them here.
+// Packages can be split into collections. A collection with combined reports opens on one small
+// report; one without is just a list of packages. A package's page loads its own rolling report, and
+// anything else (a subset of packages, a long range) fetches each package's yearly files.
 
 const config = JSON.parse(document.body.dataset.config);
 const byId = (id) => document.getElementById(id);
@@ -19,12 +20,19 @@ const MAX_SERIES = 8; // the palette has eight validated colors
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const THEME_KEY = "pypi-tracker-theme";
 
+// Without [collections] in the config, all packages form one unnamed collection.
+const COLLECTIONS = config.collections.length
+  ? config.collections
+  : [{ name: null, title: null, packages: config.packages, aggregate: config.aggregate }];
+
 const state = readUrl();
 const hiddenSeries = new Set();
 const sort = { key: "downloads", descending: true };
 const jsonCache = new Map();
 let view = null; // the data currently on screen
-let collectionSummary = null; // aggregate/summary.json
+let collectionSummary = null; // the open collection's combined summary.json, if it has one
+let controlsFor = null; // the collection the controls were built for
+let controlsAbort = null;
 let drawn = null; // the chart currently on screen
 let renderCount = 0;
 let shownSelection = null; // the packages whose figures are on screen
@@ -35,7 +43,9 @@ let controlUpdates = [];
 function readUrl() {
   const query = new URLSearchParams(location.search);
   const pick = (name, allowed, fallback) => (allowed.includes(query.get(name)) ? query.get(name) : fallback);
-  const chosen = (query.get("packages") ?? "").split(",").filter((name) => config.packages.includes(name));
+  const named = COLLECTIONS.find((item) => item.name && item.name === query.get("collection"));
+  const pool = (COLLECTIONS.length === 1 ? COLLECTIONS[0] : named)?.packages ?? [];
+  const chosen = (query.get("packages") ?? "").split(",").filter((name) => pool.includes(name));
   const range = pick("range", RANGES.map(([key]) => key), "30d");
   const start = query.get("start");
   const end = query.get("end");
@@ -46,12 +56,16 @@ function readUrl() {
     end: validCustom ? end : null,
     granularity: pick("granularity", ["daily", "weekly", "monthly"], null),
     view: pick("view", ["combined", "packages"], "combined"),
-    packages: chosen.length ? chosen : [...config.packages],
+    collection: named?.name ?? null,
+    packages: chosen.length ? chosen : [...pool],
   };
 }
 
-function writeUrl() {
+// Moving to another page (a collection, a package, back to a list) adds a history entry, so the
+// browser's back button works. Filters like the date range only replace the current entry.
+function writeUrl(newPage) {
   const query = new URLSearchParams();
+  if (COLLECTIONS.length > 1 && state.collection) query.set("collection", state.collection);
   if (state.range !== "30d") query.set("range", state.range);
   if (state.range === "custom") {
     query.set("start", state.start);
@@ -61,11 +75,41 @@ function writeUrl() {
   if (state.granularity) query.set("granularity", state.granularity);
   if (state.view !== "combined") query.set("view", state.view);
   const text = query.toString().replaceAll("%2C", ",");
-  history.replaceState(null, "", text ? `?${text}` : location.pathname);
+  const url = text ? `?${text}` : location.pathname;
+  if (newPage && url !== location.search && !(url === location.pathname && !location.search)) {
+    history.pushState(null, "", url);
+  } else {
+    history.replaceState(null, "", url);
+  }
 }
 
 function allSelected() {
-  return state.packages.length === config.packages.length;
+  return state.packages.length === members().length;
+}
+
+// The open collection, or null on the page listing them all.
+function collection() {
+  return COLLECTIONS.length === 1 ? COLLECTIONS[0] : COLLECTIONS.find((item) => item.name === state.collection) ?? null;
+}
+
+function onLanding() {
+  return !collection();
+}
+
+function members() {
+  return collection()?.packages ?? [];
+}
+
+// Where the open collection's combined reports are, when it has them.
+function combinedRoot() {
+  const name = collection()?.name;
+  return name ? `collections/${encodeURIComponent(name)}` : "aggregate";
+}
+
+function openCollection(name) {
+  state.collection = name;
+  state.packages = [...members()];
+  render();
 }
 
 // ----- Dates (always UTC, as plain YYYY-MM-DD strings) -----
@@ -113,12 +157,12 @@ function rangeDays() {
 }
 
 async function loadView() {
-  if (listOnly()) return null; // the list needs only the package names, which the page already has
+  if (onLanding() || listOnly()) return null; // these need only names, which the page already has
   const days = rangeDays();
   const canUseAggregate =
-    config.aggregate && allSelected() && config.packages.length > 1 && state.view === "combined" && config.rolling_days.includes(days);
+    collection().aggregate && allSelected() && members().length > 1 && state.view === "combined" && config.rolling_days.includes(days);
   if (canUseAggregate) {
-    const report = await loadJson(`aggregate/last-${days}-days.json`);
+    const report = await loadJson(`${combinedRoot()}/last-${days}-days.json`);
     if (report?.as_of && report.breakdown) return viewFromRolling(report);
   }
   // One package over a configured window: its own rolling report has everything, so skip the daily files.
@@ -130,9 +174,9 @@ async function loadView() {
   return viewFromPackages();
 }
 
-// Without aggregate reports there is no collection-wide view: just a list of packages to drill into.
+// A collection without combined reports has no collection-wide view: just a list of packages to drill into.
 function listOnly() {
-  return !config.aggregate && state.packages.length > 1;
+  return !onLanding() && !collection().aggregate && state.packages.length > 1;
 }
 
 // A view from one rolling report: the aggregate's (with its breakdown) or a single package's.
@@ -424,21 +468,22 @@ function buildCustomRange(meta) {
 }
 
 function buildPackageMenu() {
+  const pool = members();
   const menu = element("details", "menu");
   const summary = element("summary");
   const panel = element("div", "menu-panel");
   const everything = element("button", "link-button", "Select all");
   everything.type = "button";
-  everything.addEventListener("click", () => selectPackages([...config.packages]));
+  everything.addEventListener("click", () => selectPackages([...pool]));
   panel.append(everything);
 
-  const boxes = config.packages.map((name) => {
+  const boxes = pool.map((name) => {
     const label = element("label");
     const box = element("input");
     box.type = "checkbox";
     box.addEventListener("change", () => {
-      const next = config.packages.filter((other, index) => boxes[index].checked);
-      selectPackages(next.length ? next : [...config.packages]);
+      const next = pool.filter((other, index) => boxes[index].checked);
+      selectPackages(next.length ? next : [...pool]);
     });
     label.append(box, element("span", "", name));
     panel.append(label);
@@ -448,7 +493,7 @@ function buildPackageMenu() {
 
   document.addEventListener("click", (event) => {
     if (!menu.contains(event.target)) menu.open = false;
-  });
+  }, { signal: controlsAbort.signal });
   menu.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && menu.open) {
       menu.open = false;
@@ -457,10 +502,10 @@ function buildPackageMenu() {
   });
   controlUpdates.push(() => {
     summary.textContent = allSelected()
-      ? `All packages (${config.packages.length})`
-      : state.packages.length === 1 ? state.packages[0] : `${state.packages.length} of ${config.packages.length} packages`;
+      ? `All packages (${pool.length})`
+      : state.packages.length === 1 ? state.packages[0] : `${state.packages.length} of ${pool.length} packages`;
     boxes.forEach((box, index) => {
-      box.checked = state.packages.includes(config.packages[index]);
+      box.checked = state.packages.includes(pool[index]);
     });
   });
   return menu;
@@ -507,23 +552,45 @@ function renderMessages() {
   showMessage(notes.join(" "));
 }
 
+// The heading above the figures: a package's name, or the open collection's title when there are several.
 function renderDetail(summary) {
   const section = byId("detail");
+  const current = collection();
   const name = state.packages.length === 1 ? state.packages[0] : null;
-  section.hidden = !name;
-  if (!name) return;
-  const back = element("button", "link-button", "← All packages");
+  section.hidden = onLanding() || (!name && COLLECTIONS.length === 1);
+  if (section.hidden) return;
+
+  const parts = [];
+  const back = element("button", "link-button");
   back.type = "button";
-  back.addEventListener("click", () => selectPackages([...config.packages]));
-  const title = element("h2");
-  const link = element("a", "", name);
-  link.href = `https://pypi.org/project/${encodeURIComponent(name)}/`;
-  title.append(link);
-  const facts = element("p", "note");
-  if (summary?.earliest_date) {
-    facts.textContent = `Recorded from ${formatDate(summary.earliest_date)} to ${formatDate(summary.latest_date)}`;
+  if (name && members().length > 1) {
+    back.textContent = `← ${current.title ?? "All packages"}`;
+    back.addEventListener("click", () => selectPackages([...members()]));
+    parts.push(back);
+  } else if (COLLECTIONS.length > 1) {
+    back.textContent = "← All collections";
+    back.addEventListener("click", () => openCollection(null));
+    parts.push(back);
   }
-  section.replaceChildren(back, title, facts);
+
+  const title = element("h2");
+  const facts = element("p", "note");
+  if (name) {
+    const link = element("a", "", name);
+    link.href = `https://pypi.org/project/${encodeURIComponent(name)}/`;
+    title.append(link);
+    if (summary?.earliest_date) {
+      facts.textContent = `Recorded from ${formatDate(summary.earliest_date)} to ${formatDate(summary.latest_date)}`;
+    }
+  } else {
+    title.textContent = current.title;
+    facts.textContent = countPackages(members().length);
+  }
+  section.replaceChildren(...parts, title, facts);
+}
+
+function countPackages(count) {
+  return `${count} package${count === 1 ? "" : "s"}`;
 }
 
 function metric(label, value, note) {
@@ -539,7 +606,7 @@ function renderOverview() {
   const average = total.recorded ? total.downloads / total.recorded : null;
   const lastMetric = view.summary
     ? metric("Total recorded", formatNumber(view.summary.recorded_downloads), "All collected history")
-    : metric("Packages tracked", formatNumber(view.rows.length || state.packages.length), allSelected() ? "In this collection" : `Of ${config.packages.length} configured`);
+    : metric("Packages tracked", formatNumber(view.rows.length || state.packages.length), allSelected() ? "In this collection" : `Of ${members().length} in this collection`);
   const boxes = [
     metric("Downloads", formatNumber(total.downloads), period),
     metric("Daily average", formatNumber(average), asOf ? `Data through ${formatDate(asOf)}` : "No data"),
@@ -559,9 +626,9 @@ function renderOverview() {
 function seriesForChart() {
   if (state.view === "packages" && view.histories && state.packages.length > 1) {
     const largest = [...view.rows].sort((a, b) => (b.downloads ?? -1) - (a.downloads ?? -1)).slice(0, MAX_SERIES);
-    const names = config.packages.filter((name) => largest.some((row) => row.name === name));
+    const names = members().filter((name) => largest.some((row) => row.name === name));
     // Colors follow the package, so filtering doesn't repaint the others (up to the palette's size).
-    const colorOrder = config.packages.length <= MAX_SERIES ? config.packages : names;
+    const colorOrder = members().length <= MAX_SERIES ? members() : names;
     return names.map((name) => ({
       name,
       history: view.histories.get(name),
@@ -935,7 +1002,21 @@ function breakdownRow(row) {
   return tr;
 }
 
-// ----- Package list -----
+// ----- Collection and package lists -----
+
+function renderCollectionList() {
+  byId("collection-list").replaceChildren(
+    ...COLLECTIONS.map((item) => {
+      const open = element("button", "link-button", item.title);
+      open.type = "button";
+      open.addEventListener("click", () => openCollection(item.name));
+      const kind = item.aggregate ? " · combined totals" : "";
+      const entry = element("li");
+      entry.append(open, element("span", "item-meta", `${countPackages(item.packages.length)}${kind}`));
+      return entry;
+    }),
+  );
+}
 
 function renderPackageList() {
   byId("package-list").replaceChildren(
@@ -967,15 +1048,16 @@ function renderReports() {
     ["Daily", years.map((year) => `daily/${year}`)],
     ["Badges", config.rolling_days.map((days) => `badges/last-${days}-days`)],
   ];
-  const folder = name ? `packages/${name}/` : "aggregate/";
+  const folder = name ? `packages/${name}/` : `${decodeURIComponent(combinedRoot())}/`;
+  const scope = collection().title ? `${collection().title} combined` : "all packages combined";
   byId("reports-note").textContent = name
     ? `JSON files for ${name} in ${folder}, for use in your own tools.`
-    : `JSON files for all packages combined in ${folder}, for use in your own tools. Choose one package to see its own files.`;
+    : `JSON files for ${scope} in ${folder}, for use in your own tools. Choose one package to see its own files.`;
   byId("reports").replaceChildren(
     ...groups.filter(([, files]) => files.length).flatMap(([label, files]) => {
       const list = element("ul", "report-links");
       for (const file of files) {
-        const path = name ? packagePath(name, file) : `aggregate/${file}.json`;
+        const path = name ? packagePath(name, file) : `${combinedRoot()}/${file}.json`;
         // The folder is named once above, so each link shows only its file name.
         const link = element("a", "", `${file.split("/").at(-1)}.json`);
         link.href = path;
@@ -994,10 +1076,27 @@ function renderReports() {
 // ----- Startup -----
 
 function applyLayout() {
+  const landing = onLanding();
   const list = listOnly();
-  for (const id of ["controls", "overview", "chart-panel", "reports-panel"]) byId(id).hidden = list;
-  byId("breakdown-panel").hidden = list || state.packages.length === 1; // a package's own page already says it all
+  for (const id of ["controls", "overview", "chart-panel", "reports-panel"]) byId(id).hidden = landing || list;
+  // a package's own page already says it all
+  byId("breakdown-panel").hidden = landing || list || state.packages.length === 1;
   byId("package-list-panel").hidden = !list;
+  byId("collections-panel").hidden = !landing;
+}
+
+// Controls depend on the collection (its packages, and its date span when it has combined reports).
+async function ensureControls() {
+  const key = collection()?.name ?? "";
+  if (onLanding() || controlsFor === key) return;
+  controlsFor = key;
+  controlsAbort?.abort();
+  controlsAbort = new AbortController();
+  controlUpdates = [];
+  byId("controls").replaceChildren();
+  byId("chart-controls").replaceChildren();
+  collectionSummary = collection().aggregate ? await loadJson(`${combinedRoot()}/summary.json`) : null;
+  if (controlsFor === key) buildControls(collectionSummary);
 }
 
 // A new selection gets its own layout at once, with placeholders, instead of the old figures while it loads.
@@ -1017,13 +1116,15 @@ function showPlaceholders() {
   byId("reports-note").textContent = "";
 }
 
-async function render() {
+async function render(fromHistory = false) {
   const current = ++renderCount;
-  const selection = state.packages.join(",");
-  writeUrl();
-  controlUpdates.forEach((update) => update());
+  const selection = `${state.collection}:${state.packages.join(",")}`;
+  writeUrl(!fromHistory && shownSelection !== null && selection !== shownSelection);
   if (selection !== shownSelection) showPlaceholders();
   byId("main").setAttribute("aria-busy", "true");
+  await ensureControls();
+  if (current !== renderCount) return;
+  controlUpdates.forEach((update) => update());
   const loaded = await loadView();
   if (current !== renderCount) return; // a newer choice has already taken over
   view = loaded;
@@ -1032,7 +1133,10 @@ async function render() {
   const list = listOnly();
   applyLayout();
   renderDetail(view?.summary);
-  if (list) {
+  if (onLanding()) {
+    showMessage("");
+    renderCollectionList();
+  } else if (list) {
     showMessage("");
     renderPackageList();
   } else {
@@ -1054,8 +1158,11 @@ async function start() {
     byId("main").setAttribute("aria-busy", "false");
     return;
   }
-  collectionSummary = config.aggregate ? await loadJson("aggregate/summary.json") : null;
-  buildControls(collectionSummary);
+  // Back and forward: show whatever the URL now says.
+  addEventListener("popstate", () => {
+    Object.assign(state, readUrl());
+    render(true);
+  });
   await render();
 
   let lastWidth = byId("chart").clientWidth;

@@ -3,12 +3,12 @@
 import html
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
 
 from . import aggregation
-from .config import DashboardSettings, ReportSettings
+from .config import OTHER_COLLECTION, Collection, DashboardSettings, ReportSettings
 from .errors import ConfigError
 from .storage import History, write_atomic
 
@@ -105,10 +105,8 @@ def write_reports(
     return _write_payloads(payloads, output_dir / "packages" / package)
 
 
-def write_aggregate(
-    histories: Mapping[str, History], output_dir: Path, settings: ReportSettings
-) -> list[Path]:
-    """Write the same reports for the whole collection and return the files that changed.
+def write_aggregate(histories: Mapping[str, History], root: Path, settings: ReportSettings) -> list[Path]:
+    """Write the same reports for a group of packages combined into `root`; return the files that changed.
 
     A date counts when any package has it, so reports end at the latest date of any package.
     """
@@ -119,7 +117,7 @@ def write_aggregate(
         payload["breakdown"] = _breakdown(histories, payload["period"], payload["previous"])
     if settings.summary:
         payloads["summary.json"]["first_observed_date"] = payloads["summary.json"]["earliest_date"]
-    return _write_payloads(payloads, output_dir / "aggregate")
+    return _write_payloads(payloads, root)
 
 
 def write_site(
@@ -128,6 +126,7 @@ def write_site(
     reports: ReportSettings,
     site: DashboardSettings,
     latest: date | None = None,
+    collections: Sequence[Collection] = (),
 ) -> list[Path]:
     """Write the static site that charts the reports and return the files that changed.
 
@@ -153,16 +152,27 @@ def write_site(
             files[logo_url] = logo.read_bytes()
         except OSError as error:
             raise ConfigError(f"cannot read dashboard.logo {logo}: {error}") from error
-    files["index.html"] = _render_page(packages, reports, site, logo_url, latest)
+    files["index.html"] = _render_page(packages, reports, site, logo_url, latest, collections)
     return [output_dir / name for name, content in files.items() if write_atomic(output_dir / name, content)]
 
 
 def _render_page(
-    packages: list[str], reports: ReportSettings, site: DashboardSettings, logo_url: str | None, latest: date | None
+    packages: list[str],
+    reports: ReportSettings,
+    site: DashboardSettings,
+    logo_url: str | None,
+    latest: date | None,
+    collections: Sequence[Collection],
 ) -> str:
     title = html.escape(site.title)
     description = html.escape(site.description)
-    config = {"packages": packages, "rolling_days": sorted(set(reports.rolling_days)), "calendar": list(reports.calendar), "aggregate": reports.aggregate}
+    config = {
+        "packages": packages,
+        "rolling_days": sorted(set(reports.rolling_days)),
+        "calendar": list(reports.calendar),
+        "aggregate": reports.aggregate,
+        "collections": _page_collections(packages, collections),
+    }
     values = {
         "THEME": "" if site.theme == "auto" else f'data-theme="{site.theme}"',
         "ACCENT": f'style="--accent: {site.accent_color}"' if site.accent_color else "",
@@ -186,6 +196,21 @@ def _render_page(
     page = (_SITE_FILES / "index.html").read_text(encoding="utf-8")
     # One pass, so a title containing a placeholder's name can't be replaced a second time.
     return re.sub(r"__([A-Z]+)__", lambda match: values[match[1]], page)
+
+
+def _page_collections(packages: list[str], collections: Sequence[Collection]) -> list[dict]:
+    """The dashboard's collections, plus "Other" for any package in none, so every package is reachable."""
+    if not collections:
+        return []
+    shown = [
+        {"name": c.name, "title": c.title or c.name, "packages": list(c.packages), "aggregate": c.aggregate}
+        for c in collections
+    ]
+    grouped = {package for c in collections for package in c.packages}
+    other = [package for package in packages if package not in grouped]
+    if other:
+        shown.append({"name": OTHER_COLLECTION, "title": "Other", "packages": other, "aggregate": False})
+    return shown
 
 
 def _payloads(who: str | list[str], history: History, settings: ReportSettings) -> dict[str, dict]:

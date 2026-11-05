@@ -9,6 +9,7 @@ from . import aggregation, reports
 from .client import fetch_overall
 from .config import (
     DEFAULT_DATA_DIR,
+    Collection,
     DEFAULT_OUTPUT_DIR,
     DashboardSettings,
     ReportSettings,
@@ -28,8 +29,12 @@ class Tracker:
         output_dir: str | Path = DEFAULT_OUTPUT_DIR,
         reports: ReportSettings = ReportSettings(),
         site: DashboardSettings = DashboardSettings(),
+        collections: Iterable[Collection] = (),
     ):
-        self.packages = normalize_packages(packages)
+        self.collections = list(collections)
+        # Every collection's packages are tracked too, without listing them twice.
+        members = [package for collection in self.collections for package in collection.packages]
+        self.packages = normalize_packages([*packages, *members])
         self.data_dir = resolve_path(data_dir)
         self.output_dir = resolve_path(output_dir)
         self.reports = reports
@@ -43,7 +48,10 @@ class Tracker:
         output_dir: str | Path | None = None,
         packages: Iterable[str] | None = None,
     ) -> Self:
-        """Load a config file. Explicit arguments win over its values, which win over defaults."""
+        """Load a config file. Explicit arguments win over its values, which win over defaults.
+
+        Explicit `packages` replace the config's packages and collections, for a run of just those.
+        """
         config = load_config(path)
         return cls(
             packages=packages or config.packages,
@@ -51,6 +59,7 @@ class Tracker:
             output_dir=output_dir or config.output_dir or DEFAULT_OUTPUT_DIR,
             reports=config.reports,
             site=config.dashboard,
+            collections=() if packages else config.collections,
         )
 
     def collect(self) -> list[str]:
@@ -75,8 +84,9 @@ class Tracker:
         """Generate JSON reports from local CSVs and return the files that changed.
 
         Never touches the network. Raises PartialFailure after trying every package.
-        Collection-wide output is only written when building every package, with no failures, and
-        aggregate reports only when `reports.aggregate` is on.
+        Combined output is only written when building every package, with no failures: with
+        collections, for each collection that has `aggregate`; otherwise for all packages, when
+        `reports.aggregate` is on.
         """
         return self._build(packages, site=self.site.enabled)
 
@@ -93,8 +103,14 @@ class Tracker:
         if failures:
             raise PartialFailure("report generation", failures)
         if packages is None:
-            if self.reports.aggregate:
-                written += reports.write_aggregate(histories, self.output_dir, self.reports)
+            if self.collections:
+                for collection in self.collections:
+                    if collection.aggregate:
+                        members = {package: histories[package] for package in collection.packages}
+                        root = self.output_dir / "collections" / collection.name
+                        written += reports.write_aggregate(members, root, self.reports)
+            elif self.reports.aggregate:
+                written += reports.write_aggregate(histories, self.output_dir / "aggregate", self.reports)
             if site:
                 written += self._write_site(histories)
         return written
@@ -134,7 +150,7 @@ class Tracker:
 
     def _write_site(self, histories: dict[str, History]) -> list[Path]:
         latest = max((max(history) for history in histories.values() if history), default=None)
-        return reports.write_site(self._selected(), self.output_dir, self.reports, self.site, latest)
+        return reports.write_site(self._selected(), self.output_dir, self.reports, self.site, latest, self.collections)
 
     def _collect_one(self, package: str) -> bool:
         path = self._csv_path(package)

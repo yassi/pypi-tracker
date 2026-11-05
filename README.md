@@ -15,7 +15,8 @@ pypi-tracker sync --package dj-control-room
 ```
 
 You now have the full history in `data/dj-control-room.csv` and reports in
-`public/packages/dj-control-room/` (`public/aggregate/` covers all your packages together), such as `last-30-days.json`:
+`public/packages/dj-control-room/` (`public/aggregate/` covers all your packages together, unless you use
+[collections](#collections)), such as `last-30-days.json`:
 
 ```json
 {
@@ -92,6 +93,25 @@ You can update both reports and historical data by running a single `sync` comma
 pypi-tracker sync --config pypi-tracker.toml
 ```
 
+## Collections
+
+Collections split your packages into groups, each its own page on the dashboard. Give one
+`aggregate = true` when its packages belong together, like one product's packages, to get combined totals,
+reports and badges for it. Leave it off for groups where a total means little, like web frameworks:
+
+```toml
+[collections.dcr]
+title = "Django Control Room"
+packages = ["dj-control-room", "dj-redis-panel", "dj-cache-panel"]
+aggregate = true
+
+[collections.frameworks]
+title = "Web frameworks"
+packages = ["django", "flask", "fastapi"]
+```
+
+With collections, nothing adds up all your packages at once. See the [guide](docs/guide.md#collections).
+
 ## Publish a dashboard
 
 `dashboard` turns your history into a complete static website, ready for any static host. It needs no
@@ -124,7 +144,8 @@ Cloudflare Pages setup.
 ## Available reports
 
 `build` writes these JSON files for each package to `public/packages/<package>/`, and for all packages
-combined to `public/aggregate/` unless `aggregate = false`. The `[reports]` config section chooses which are generated.
+combined to `public/aggregate/` unless `aggregate = false`, or to `public/collections/<name>/` for each
+[collection](#collections) with `aggregate = true`. The `[reports]` config section chooses which are generated.
 
 | File | Contents |
 |---|---|

@@ -6,7 +6,7 @@ from datetime import date
 import pytest
 from conftest import days
 
-from pypi_tracker import ConfigError, DashboardSettings, PartialFailure, ReportSettings, Tracker
+from pypi_tracker import Collection, ConfigError, DashboardSettings, PartialFailure, ReportSettings, Tracker
 from pypi_tracker.aggregation import combine
 from pypi_tracker.cli import main
 from pypi_tracker.config import load_config
@@ -135,6 +135,44 @@ class TestAggregateReports:
         assert api.requests == []
 
 
+class TestCollections:
+    @pytest.fixture
+    def tracker(self, tmp_path):
+        return make_tracker(
+            tmp_path,
+            {"loose": days("2026-01-01", 3), "dj-a": days("2026-01-01", 3), "dj-b": days("2026-01-01", 3, downloads=5), "django": days("2026-01-01", 3)},
+            collections=[
+                Collection("dcr", ["dj-a", "dj-b"], "Django Control Room", aggregate=True),
+                Collection("frameworks", ["django", "dj-a"]),
+            ],
+        )
+
+    def test_only_collections_with_aggregate_get_combined_reports(self, tracker):
+        tracker.build()
+        report = json.loads((tracker.output_dir / "collections" / "dcr" / "last-7-days.json").read_text())
+        assert report["packages"] == ["dj-a", "dj-b"]
+        assert report["downloads"] == 45
+        assert (tracker.output_dir / "collections" / "dcr" / "badges" / "last-7-days.json").exists()
+        assert not (tracker.output_dir / "collections" / "frameworks").exists()
+
+    def test_no_report_combines_everything(self, tracker):
+        tracker.build()
+        assert not (tracker.output_dir / "aggregate").exists()
+
+    def test_page_lists_collections_and_groups_the_rest_as_other(self, tracker):
+        tracker.dashboard()
+        assert page_config(tracker)["collections"] == [
+            {"name": "dcr", "title": "Django Control Room", "packages": ["dj-a", "dj-b"], "aggregate": True},
+            {"name": "frameworks", "title": "frameworks", "packages": ["django", "dj-a"], "aggregate": False},
+            {"name": "other", "title": "Other", "packages": ["loose"], "aggregate": False},
+        ]
+
+    def test_no_other_when_every_package_is_in_a_collection(self, tmp_path):
+        tracker = make_tracker(tmp_path, {"dj-a": days("2026-01-01", 1)}, collections=[Collection("dcr", ["dj-a"])])
+        tracker.dashboard()
+        assert [item["name"] for item in page_config(tracker)["collections"]] == ["dcr"]
+
+
 class TestSite:
     def test_layout(self, tracker):
         tracker.dashboard()
@@ -188,7 +226,7 @@ class TestSite:
             tmp_path, {"foo": days("2026-01-01", 1)}, reports=ReportSettings(rolling_days=[30, 7, 30], calendar=[])
         )
         tracker.dashboard()
-        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30], "calendar": [], "aggregate": True}
+        assert page_config(tracker) == {"packages": ["foo"], "rolling_days": [7, 30], "calendar": [], "aggregate": True, "collections": []}
 
     def test_without_a_package_list_it_charts_everything_stored(self, tmp_path):
         write_history(tmp_path / "d" / "b.csv", days("2026-01-01", 1))

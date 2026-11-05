@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pypi_tracker import ConfigError, ReportSettings, Tracker
+from pypi_tracker import Collection, ConfigError, ReportSettings, Tracker
 from pypi_tracker.config import load_config, normalize_packages, resolve_path
 
 
@@ -40,6 +40,36 @@ directory = "site/"
     assert config.output_dir == (path.parent / "site").resolve()
 
 
+def test_loads_collections(tmp_path):
+    config = load_config(write(tmp_path, """
+packages = ["loose"]
+
+[collections.dcr]
+title = "Django Control Room"
+packages = ["dj-control-room", "DJ_Redis_Panel"]
+aggregate = true
+
+[collections.frameworks]
+packages = ["django", "flask"]
+"""))
+    assert config.packages == ["loose"]
+    assert config.collections == [
+        Collection("dcr", ("dj-control-room", "dj-redis-panel"), "Django Control Room", True),
+        Collection("frameworks", ("django", "flask")),
+    ]
+
+
+def test_collection_packages_are_tracked_once_each():
+    tracker = Tracker(["a", "b"], collections=[Collection("one", ["b", "c"]), Collection("two", ["c", "d"])])
+    assert tracker.packages == ["a", "b", "c", "d"]
+
+
+def test_explicit_packages_replace_the_configs_collections(tmp_path):
+    path = write(tmp_path, '[collections.dcr]\npackages = ["foo"]\naggregate = true\n')
+    tracker = Tracker.from_config(path, packages=["bar"])
+    assert (tracker.packages, tracker.collections) == (["bar"], [])
+
+
 def test_omitted_report_keys_use_defaults(tmp_path):
     config = load_config(write(tmp_path, 'packages = ["foo"]\n[reports]\nsummary = false\n'))
     assert config.reports.rolling_days == (7, 30, 90, 180)
@@ -64,6 +94,18 @@ def test_omitted_report_keys_use_defaults(tmp_path):
         ('[reports]\nsummary = "yes"\n', "true or false"),
         ('[reports]\naggregate = 1\n', "reports.aggregate must be true or false"),
         ("[storage]\ndirectory = 3\n", "must be a path"),
+        ('collections = ["dcr"]\n', "'collections' must be a mapping"),
+        ('[collections]\ndcr = ["foo"]\n', "'collections.dcr' must be a mapping"),
+        ('[collections.DCR]\npackages = ["foo"]\n', "collection names must be lowercase"),
+        ('[collections."../up"]\npackages = ["foo"]\n', "collection names must be lowercase"),
+        ('[collections.other]\npackages = ["foo"]\n', "reserved for packages in no collection"),
+        ("[collections.dcr]\npackages = []\n", "at least one package"),
+        ("[collections.dcr]\n", "collections.dcr.packages is required"),
+        ('[collections.dcr]\npackages = ["../x"]\n', "invalid package name"),
+        ('[collections.dcr]\npackages = ["foo"]\naggregate = "yes"\n', "collections.dcr.aggregate must be true or false"),
+        ('[collections.dcr]\npackages = ["foo"]\ntitle = 3\n', "collections.dcr.title must be text"),
+        ('[collections.dcr]\npackages = ["foo"]\ntotal = true\n', "unknown key"),
+        ('[reports]\naggregate = true\n[collections.dcr]\npackages = ["foo"]\n', "set aggregate on each collection"),
         ('storage = "data/"\n', "must be a mapping"),
         ("packages = [\n", "invalid TOML"),
     ],

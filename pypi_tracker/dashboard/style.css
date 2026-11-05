@@ -773,6 +773,12 @@ th[aria-sort] .sort {
   border-bottom: 0;
 }
 
+.item-meta {
+  margin-left: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .reports-note {
   margin: 0 0 12px;
 }

@@ -236,10 +236,37 @@ The identifier key is `week` (`"2026-W44"`), `month` (`"2026-10"`) or `year` (`2
 **`summary.json`** holds `as_of`, `earliest_date`, `latest_date`, `recorded_downloads`, `recorded_days`,
 `missing_days` and `gaps` (a list of `{start, end, days}`).
 
+## Collections
+
+Collections split packages into separate groups, such as one product's packages, web frameworks or machine
+learning libraries. Each is a section with its `packages` and optionally a `title`:
+
+```toml
+[collections.dcr]
+title = "Django Control Room"
+packages = ["dj-control-room", "dj-redis-panel", "dj-cache-panel"]
+aggregate = true            # one product: write combined reports and show totals
+
+[collections.frameworks]
+title = "Web frameworks"
+packages = ["django", "flask", "fastapi"]
+```
+
+- Collection packages are tracked like the top-level `packages`; list each package once anywhere. A package
+  can be in several collections, and is still fetched once.
+- Only a collection with `aggregate = true` gets combined reports, in `collections/<name>/`, with the same
+  files as [aggregate reports](#aggregate-reports). Totals across collections are never reported, since
+  collections can overlap and adding up unrelated packages means little.
+- With collections, `aggregate/` isn't written and `reports.aggregate` doesn't apply; setting it is an error.
+- Names are lowercase letters, digits and dashes. `other` is reserved: the dashboard lists packages that
+  are in no collection under "Other".
+- `--package` on the command line runs just those packages and ignores collections.
+
 ## Aggregate reports
 
-`build` also writes the same reports for the whole collection to `aggregate/`, with `packages` (a list)
-in place of `package`. A date counts when any package has data for it: packages with no data that day
+Without collections, `build` also writes the same reports for all packages combined to `aggregate/`, with
+`packages` (a list) in place of `package`. A collection with `aggregate = true` gets the same reports in
+`collections/<name>/`. A date counts when any package has data for it: packages with no data that day
 add nothing, so a day's total can cover only some packages. Dates are `null` only when no package has them,
 and rolling windows end on the latest date of any package.
 
@@ -308,7 +335,10 @@ accent_color = "#6366f1"
   be shared. `view=packages` shows one line per package, up to the eight largest.
 - The header says "Data through" the newest date any package has data for. It is the data's date, not
   when the site was built, so the page only changes when the data does.
-- With `aggregate = false`, the dashboard never shows a combined total. Its first view is just the list
+- With collections, the dashboard opens on the list of collections. A collection with `aggregate = true`
+  opens on its totals and combined chart; any other collection is a list of its packages. URLs name the
+  open collection, such as `?collection=dcr`.
+- Without collections and with `aggregate = false`, the dashboard never shows a combined total. Its first view is just the list
   of package names, which loads no data, and choosing one opens its charts.
 - The first view loads only `aggregate/summary.json` and one rolling report. Other views fetch each
   selected package's yearly files and are combined in the browser.
@@ -405,6 +435,8 @@ A browser on another origin can only read the JSON with CORS enabled. On Cloudfl
 /packages/*
   Access-Control-Allow-Origin: *
 /aggregate/*
+  Access-Control-Allow-Origin: *
+/collections/*
   Access-Control-Allow-Origin: *
 ```
 
