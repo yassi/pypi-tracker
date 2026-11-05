@@ -20,6 +20,8 @@ _DEFAULT_ICON = (
     "%3Cpath d='M3 11l3-3 3 2 4-5' fill='none' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E"
 )
 
+_BADGE_PERIODS = {7: "week", 30: "month", 365: "year"}
+
 _CALENDAR = {
     "weekly": aggregation.weekly,
     "monthly": aggregation.monthly,
@@ -65,6 +67,25 @@ def summary_report(who: str | list[str], history: History) -> dict:
         "as_of": _as_of(history),
         **aggregation.summarize(history),
     }
+
+
+def badge(days: int, downloads: int | None) -> dict:
+    """A shields.io endpoint badge for a rolling window: https://shields.io/badges/endpoint-badge"""
+    period = _BADGE_PERIODS.get(days, f"{days} days")
+    if downloads is None:
+        return {"schemaVersion": 1, "label": f"downloads/{period}", "message": "no data", "color": "lightgrey"}
+    return {"schemaVersion": 1, "label": f"downloads/{period}", "message": compact_number(downloads), "color": "blue"}
+
+
+def compact_number(number: int) -> str:
+    """950, 1.2k, 38.1k, 1.0M: one decimal place once shortened, rounding up into the next unit when needed."""
+    value = float(number)
+    for suffix in ("", "k", "M", "B"):
+        shown = f"{value:.1f}" if suffix else f"{value:.0f}"
+        if float(shown) < 1000 or suffix == "B":
+            return shown + suffix
+        value /= 1000
+    raise AssertionError("unreachable")
 
 
 def daily_reports(who: str | list[str], history: History) -> dict[int, dict]:
@@ -160,6 +181,7 @@ def _payloads(who: str | list[str], history: History, settings: ReportSettings) 
         payloads["summary.json"] = summary_report(who, history)
     for days in settings.rolling_days:
         payloads[f"last-{days}-days.json"] = rolling_report(who, history, days)
+        payloads[f"badges/last-{days}-days.json"] = badge(days, payloads[f"last-{days}-days.json"]["downloads"])
     for name in settings.calendar:
         payloads[f"{name}.json"] = calendar_report(who, history, name)
     if "daily" in settings.historical:

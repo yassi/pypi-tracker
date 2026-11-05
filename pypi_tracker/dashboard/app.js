@@ -937,6 +937,7 @@ function renderReports() {
     ["Rolling", config.rolling_days.map((days) => `last-${days}-days`)],
     ["Calendar", config.calendar],
     ["Daily", years.map((year) => `daily/${year}`)],
+    ["Badges", config.rolling_days.map((days) => `badges/last-${days}-days`)],
   ];
   const folder = name ? `packages/${name}/` : "aggregate/";
   byId("reports-note").textContent = name

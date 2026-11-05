@@ -169,9 +169,12 @@ public/packages/dj-control-room/
 ├── weekly.json
 ├── monthly.json
 ├── yearly.json
-└── daily/
-    ├── 2025.json
-    └── 2026.json
+├── daily/
+│   ├── 2025.json
+│   └── 2026.json
+└── badges/
+    ├── last-7-days.json   (one badge per rolling window)
+    └── last-30-days.json
 ```
 
 Reports are generated only from local data. Output is deterministic, each file is replaced atomically
@@ -244,6 +247,28 @@ Aggregate downloads are a sum of downloads, not unique installs or users.
 Aggregate rolling reports add `breakdown`, each package's own numbers for that window:
 `{package, downloads, recorded_days, missing_days, previous_downloads}`. Aggregate `summary.json` adds
 `first_observed_date`, the earliest date from any package.
+
+## Badges
+
+Each rolling window also gets a [shields.io endpoint badge](https://shields.io/badges/endpoint-badge) in
+`badges/`, for every package and for `aggregate/`:
+
+```json
+{"schemaVersion": 1, "label": "downloads/month", "message": "38.1k", "color": "blue"}
+```
+
+The 7, 30 and 365 day windows are labelled week, month and year; others say how many days, such as
+"downloads/90 days". A window with no data says "no data". Counts are rounded to one decimal place once shortened (950, 1.2k, 38.1k, 1.0M) and,
+like the reports, sum the recorded days, so a window with missing days shows a lower bound.
+
+Host `public/`, then pass a badge file's URL to shields.io:
+
+```markdown
+![downloads](https://img.shields.io/endpoint?url=https://stats.example.com/aggregate/badges/last-30-days.json)
+```
+
+shields.io fetches the file from its own servers, so badges don't need CORS. Between shields.io's cache and
+GitHub's image proxy, a badge can lag your latest `sync` by a while.
 
 ## Dashboard
 

@@ -133,6 +133,13 @@ combined to `public/aggregate/`. The `[reports]` config section chooses which ar
 | `monthly.json` | Totals for every calendar month. |
 | `yearly.json` | Totals for every calendar year. |
 | `daily/<year>.json` | Every recorded day in that year, such as `daily/2026.json`. |
+| `badges/last-<N>-days.json` | A [shields.io](https://shields.io/badges/endpoint-badge) badge for each rolling window, such as "downloads/month: 38.1k". |
 
 Aggregate rolling reports also include `breakdown`, each package's own numbers for that window. The
 dashboard links to the files behind whatever it is showing.
+
+Once `public/` is hosted, put a badge in any README by giving shields.io the badge file's URL:
+
+```markdown
+![downloads](https://img.shields.io/endpoint?url=https://stats.example.com/packages/dj-control-room/badges/last-30-days.json)
+```

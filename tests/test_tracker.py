@@ -7,6 +7,7 @@ import pytest
 from conftest import days
 
 from pypi_tracker import ConfigError, HistoryError, PartialFailure, ReportSettings, Tracker
+from pypi_tracker.reports import badge, compact_number
 from pypi_tracker.storage import write_history
 
 OLD = {"2020-01-01": 1, "2020-01-02": 2}
@@ -141,6 +142,10 @@ class TestBuild:
 
     def test_generates_the_documented_layout(self, built):
         assert sorted(tree(built)) == [
+            "badges/last-180-days.json",
+            "badges/last-30-days.json",
+            "badges/last-7-days.json",
+            "badges/last-90-days.json",
             "daily/2025.json",
             "daily/2026.json",
             "last-180-days.json",
@@ -237,7 +242,7 @@ class TestBuild:
         )
         write_history(tmp_path / "d" / "foo.csv", days("2026-01-01", 1))
         tracker.build()
-        assert sorted(tree(tmp_path / "o" / "packages" / "foo")) == ["last-14-days.json", "monthly.json"]
+        assert sorted(tree(tmp_path / "o" / "packages" / "foo")) == ["badges/last-14-days.json", "last-14-days.json", "monthly.json"]
 
     def test_empty_history_produces_explicitly_unavailable_reports(self, tracker):
         write_history(tracker.data_dir / "foo.csv", {})
@@ -301,3 +306,29 @@ def test_validate_separates_problems_from_gaps(tmp_path):
 def test_history_of_unknown_package_raises(tmp_path):
     with pytest.raises(HistoryError):
         Tracker(data_dir=tmp_path).history("nope")
+
+
+class TestBadges:
+    @pytest.mark.parametrize(
+        ("number", "shown"),
+        [(0, "0"), (999, "999"), (1000, "1.0k"), (1234, "1.2k"), (9960, "10.0k"), (38071, "38.1k"),
+         (999_940, "999.9k"), (999_960, "1.0M"), (1_260_000, "1.3M"), (12_345_678_901_234, "12345.7B")],
+    )
+    def test_compact_number(self, number, shown):
+        assert compact_number(number) == shown
+
+    def test_periods_and_missing_data(self):
+        assert badge(7, 1234) == {"schemaVersion": 1, "label": "downloads/week", "message": "1.2k", "color": "blue"}
+        assert badge(30, 5)["label"] == "downloads/month"
+        assert badge(90, 5)["label"] == "downloads/90 days"
+        assert badge(30, None) == {"schemaVersion": 1, "label": "downloads/month", "message": "no data", "color": "lightgrey"}
+
+    def test_written_for_packages_and_the_aggregate(self, tmp_path):
+        tracker = Tracker(["foo", "bar"], data_dir=tmp_path / "d", output_dir=tmp_path / "o")
+        write_history(tmp_path / "d" / "foo.csv", days("2026-01-01", 30, downloads=1000))
+        write_history(tmp_path / "d" / "bar.csv", days("2026-01-01", 30, downloads=300))
+        tracker.build()
+        read = lambda path: json.loads((tmp_path / "o" / path).read_text())
+        assert read("packages/foo/badges/last-30-days.json")["message"] == "30.0k"
+        assert read("aggregate/badges/last-30-days.json")["message"] == "39.0k"
+        assert read("aggregate/badges/last-7-days.json")["message"] == "9.1k"
